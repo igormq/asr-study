@@ -179,7 +179,9 @@ class RHN(Recurrent):
 
         self.layer_norm = None
         if self.has_layer_norm:
-            self.layer_norm = LayerNormalization(num_var=(2 + (not self.coupling)))
+            # Should layer norm be applied to all the pre activations?
+            # self.layer_norm = LayerNormalization(num_var=(2 + (not self.coupling)))
+            self.layer_norm = LayerNormalization()
 
         super(RHN, self).__init__(**kwargs)
 
@@ -254,10 +256,14 @@ class RHN(Recurrent):
             else:
                 a = K.dot(s_tm1 * B_U, self.U) + self.b
 
-            if self.has_layer_norm:
-                a = self.layer_norm(a)
+            # LN should be applied to all activation or only to activation?
+            # if self.has_layer_norm:
+                # a = self.layer_norm(a)
 
             a0 = a[:, :self.output_dim]
+            if self.has_layer_norm:
+                a0 = self.layer_norm(a0)
+
             a1 = a[:, self.output_dim: 2 * self.output_dim]
             if not self.coupling:
              a2 = a[:, 2 * self.output_dim:]
