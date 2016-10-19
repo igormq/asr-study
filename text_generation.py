@@ -83,7 +83,7 @@ model = Sequential()
 
 if args.layer == 'rhn':
     model.add(RHN(args.output_dim, input_shape=(maxlen, len(chars)),
-                  layer_norm=args.layer_norm), nb_layers=args.nb_layers)
+                  layer_norm=args.layer_norm, nb_layers=args.nb_layers))
 else:
     model.add(RNN(args.output_dim, input_shape=(maxlen, len(chars))))
     for l in xrange(args.nb_layers-1):
