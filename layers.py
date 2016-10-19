@@ -13,6 +13,12 @@ def highway_bias_initializer(shape, name=None):
     return -2*initializations.one(shape, name=name)
 
 
+def layer_normalization(x, gain, bias, epsilon=1e-5):
+    m = K.mean(x, axis=-1, keepdims=True)
+    std = K.std(x, axis=-1, keepdims=True)
+    x_normed = (x - m) / (std + epsilon) * gain + bias
+    return x_normed
+
 class LayerNormalization(Layer):
     '''Normalize from all of the summed inputs to the neurons in a layer on
     a single training case. Unlike batch normalization, layer normalization
@@ -41,10 +47,9 @@ class LayerNormalization(Layer):
     # References
         - [Layer Normalization](https://arxiv.org/abs/1607.06450)
     '''
-    def __init__(self, epsilon=1e-5, num_var=1, weights=None, gain_init='one',
+    def __init__(self, epsilon=1e-5, weights=None, gain_init='one',
                  bias_init='zero', **kwargs):
         self.epsilon = epsilon
-        self.num_var = num_var
         self.gain_init = initializations.get(gain_init)
         self.bias_init = initializations.get(bias_init)
         self.initial_weights = weights
@@ -67,50 +72,7 @@ class LayerNormalization(Layer):
         self.built = True
 
     def call(self, x, mask=None):
-
-        input_shape = self.input_spec[0].shape
-        output_dim =  input_shape[-1] // self.num_var
-
-        if self.num_var == 1:
-            input_list = [x]
-            g_list = [self.g]
-            b_list = [self.b]
-        else:
-            # input_list = [x[i*output_dim:(i+1)*output_dim] for i in xrange(self.num_var)]
-            # TODO: Fix this issue
-            import tensorflow as tf
-            input_list = tf.split(1, self.num_var, x)
-
-            g_list = [self.g[i*output_dim:(i+1)*output_dim] for i in xrange(self.num_var)]
-            b_list = [self.b[i*output_dim:(i+1)*output_dim] for i in xrange(self.num_var)]
-
-        outputs = []
-        for n in xrange(self.num_var):
-            x = input_list[n]
-            g = g_list[n]
-            b = b_list[n]
-
-            m, std = self._moments(x)
-            x_normed = (x - m) / (std + self.epsilon)
-
-            output = g*x_normed + b
-
-            outputs.append(output)
-
-
-        if self.num_var == 1:
-            return outputs[0]
-        else:
-            return K.concatenate(outputs)
-
-    def _moments(self, x):
-        '''
-        # Arguments
-            x: matrix [batch_size, output_dim]
-        '''
-        m = K.mean(x, axis=-1, keepdims=True)
-        std = K.sqrt(K.var(x, axis=-1, keepdims=True) + self.epsilon)
-        return m, std
+        return layer_normalization(x, self.g, self.b, epsilon=self.epsilon)
 
     def get_config(self):
         config = {"epsilon": self.epsilon,
@@ -158,7 +120,8 @@ class RHN(Recurrent):
                  init='glorot_uniform', inner_init='orthogonal',
                  bias_init=highway_bias_initializer,
                  activation='tanh', inner_activation='hard_sigmoid',
-                 coupling=True, layer_norm=False, W_regularizer=None, U_regularizer=None,
+                 coupling=True, layer_norm=False, ln_gain_init='one', ln_bias_init='zero',
+                 W_regularizer=None, U_regularizer=None,
                  b_regularizer=None, dropout_W=0., dropout_U=0., **kwargs):
         self.output_dim = output_dim
         self.nb_layers = nb_layers
@@ -169,6 +132,8 @@ class RHN(Recurrent):
         self.inner_activation = activations.get(inner_activation)
         self.coupling = coupling
         self.has_layer_norm = layer_norm
+        self.ln_gain_init = initializations.get(ln_gain_init)
+        self.ln_bias_init = initializations.get(ln_bias_init)
         self.W_regularizer = regularizers.get(W_regularizer)
         self.U_regularizer = regularizers.get(U_regularizer)
         self.b_regularizer = regularizers.get(b_regularizer)
@@ -177,14 +142,7 @@ class RHN(Recurrent):
         if self.dropout_W or self.dropout_U:
             self.uses_learning_phase = True
 
-        self.layer_norm = None
-        if self.has_layer_norm:
-            # Should layer norm be applied to all the pre activations?
-            # self.layer_norm = LayerNormalization(num_var=(2 + (not self.coupling)))
-            self.layer_norm = LayerNormalization()
-
         super(RHN, self).__init__(**kwargs)
-
 
         if not self.consume_less == "gpu":
             warnings.warn("Ignoring consume_less=%s. Setting to 'gpu'." % self.consume_less)
@@ -201,8 +159,8 @@ class RHN(Recurrent):
 
         self.W = self.init((self.input_dim, (2 + (not self.coupling)) * self.output_dim),
                            name='{}_W'.format(self.name))
-        self.U = self.inner_init((self.output_dim, (2 + (not self.coupling)) * self.output_dim),
-                                 name='{}_U'.format(self.name))
+        self.Us = [self.inner_init((self.output_dim, (2 + (not self.coupling)) * self.output_dim),
+                                    name='%s_%d_U' %(self.name, i)) for i in xrange(self.nb_layers)]
 
         bias_init_value = K.get_value(self.bias_init((self.output_dim,)))
         b = [np.zeros(self.output_dim),
@@ -211,9 +169,17 @@ class RHN(Recurrent):
         if not self.coupling:
             b.append(np.copy(bias_init_value))
 
-        self.b = K.variable(np.hstack(b),
-                            name='{}_b'.format(self.name))
-        self.trainable_weights = [self.W, self.U, self.b]
+        self.bs = [K.variable(np.hstack(b), name='%s_%d_b' %(self.name, i)) for i in xrange(self.nb_layers)]
+
+        self.trainable_weights = [self.W] + self.Us +  self.bs
+        if self.has_layer_norm:
+            self.ln_weights = []
+            ln_names = ['h', 't', 'c']
+            for l in xrange(self.nb_layers):
+                ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
+                ln_biases = [self.ln_bias_init((self.output_dim,), name='%s_%d_ln_bias_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
+                self.ln_weights.append([ln_gains, ln_biases])
+                self.trainable_weights += ln_gains + ln_biases
 
         self.regularizers = []
         if self.W_regularizer:
@@ -229,7 +195,6 @@ class RHN(Recurrent):
         if self.initial_weights is not None:
             self.set_weights(self.initial_weights)
             del self.initial_weights
-
 
     def reset_states(self):
         assert self.stateful, 'Layer must be stateful.'
@@ -249,24 +214,29 @@ class RHN(Recurrent):
 
         for layer in xrange(self.nb_layers):
             B_U = B_U_W[layer][0]
+            U, b = self.Us[layer], self.bs[layer]
 
             if layer == 0:
                 B_W = B_U_W[layer][1]
-                a = K.dot(x * B_W, self.W) + K.dot(s_tm1 * B_U, self.U) + self.b
+                a = K.dot(x * B_W, self.W) + K.dot(s_tm1 * B_U, U) + b
             else:
-                a = K.dot(s_tm1 * B_U, self.U) + self.b
+                a = K.dot(s_tm1 * B_U, U) + b
 
             # LN should be applied to all activation or only to activation?
             # if self.has_layer_norm:
                 # a = self.layer_norm(a)
 
             a0 = a[:, :self.output_dim]
-            if self.has_layer_norm:
-                a0 = self.layer_norm(a0)
-
             a1 = a[:, self.output_dim: 2 * self.output_dim]
             if not self.coupling:
-             a2 = a[:, 2 * self.output_dim:]
+                a2 = a[:, 2 * self.output_dim:]
+
+            if self.has_layer_norm:
+                ln_gains, ln_biases = self.ln_weights[layer]
+                a0 = layer_normalization(a0, ln_gains[0], ln_biases[0])
+                a1 = layer_normalization(a1, ln_gains[1], ln_biases[1])
+                if not self.coupling:
+                    a2 = layer_normalization(a2, ln_gains[2], ln_biases[2])
 
             # Equation 7
             h =  self.activation(a0)
@@ -321,7 +291,9 @@ class RHN(Recurrent):
                   'activation': self.activation.__name__,
                   'inner_activation': self.inner_activation.__name__,
                   'coupling': self.coupling,
-                  'layer_norm': self.layer_norm,
+                  'has_layer_norm': self.has_layer_norm,
+                  'ln_gain_init': self.ln_gain_init.__name__,
+                  'ln_bias_init': self.ln_bias_init.__name__,
                   'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
                   'U_regularizer': self.U_regularizer.get_config() if self.U_regularizer else None,
                   'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
@@ -336,5 +308,5 @@ if __name__ == "__main__":
     from keras.utils.visualize_util import plot
 
     model = Sequential()
-    model.add(RHN(10, input_dim=2, layer_norm=True))
-    plot(model)
+    model.add(RHN(10, input_dim=2, nb_layers=2, layer_norm=True))
+    # plot(model)
