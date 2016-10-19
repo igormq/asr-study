@@ -20,6 +20,9 @@ import numpy as np
 import random
 import sys
 from layers import RHN
+import uuid
+import os
+import cPickle as pickle
 
 path = get_file('nietzsche.txt', origin="https://s3.amazonaws.com/text-datasets/nietzsche.txt")
 text = open(path).read().lower()
@@ -52,7 +55,7 @@ for i, sentence in enumerate(sentences):
 # build the model: a single LSTM
 print('Build model...')
 model = Sequential()
-model.add(RHN(186, input_shape=(maxlen, len(chars)), layer_norm=True))
+model.add(RHN(2, input_shape=(maxlen, len(chars)), layer_norm=True))
 model.add(Dense(len(chars)))
 model.add(Activation('softmax'))
 
@@ -70,23 +73,21 @@ def sample(preds, temperature=1.0):
     return np.argmax(probas)
 
 # train the model, output generated text after each iteration
-for iteration in range(1, 60):
-    print()
-    print('-' * 50)
-    print('Iteration', iteration)
-    model.fit(X, y, batch_size=128, nb_epoch=1)
+history = []
+for _ in xrange(2):
+    his = model.fit(X, y, batch_size=128, nb_epoch=1)
+    his = his.history
 
     start_index = random.randint(0, len(text) - maxlen - 1)
 
+    his['seed'] = text[start_index: start_index + maxlen]
+
     for diversity in [0.2, 0.5, 1.0, 1.2]:
-        print()
-        print('----- diversity:', diversity)
 
         generated = ''
         sentence = text[start_index: start_index + maxlen]
         generated += sentence
-        print('----- Generating with seed: "' + sentence + '"')
-        sys.stdout.write(generated)
+
 
         for i in range(400):
             x = np.zeros((1, maxlen, len(chars)))
@@ -100,6 +101,14 @@ for iteration in range(1, 60):
             generated += next_char
             sentence = sentence[1:] + next_char
 
-            sys.stdout.write(next_char)
-            sys.stdout.flush()
-        print()
+        his['diversity_%.1f' % diversity] = generated
+
+    history.append(his)
+if not os.path.isdir('results'):
+    os.makedirs('results')
+name = os.path.join('results', str(uuid.uuid1()))
+print('Saving at ./%s' % name)
+with open(name, 'wb') as f:
+    pickle.dump(history, f)
+
+model.save('%s.h5' % name)
