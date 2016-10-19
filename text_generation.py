@@ -13,7 +13,7 @@ has at least ~100k characters. ~1M is better.
 from __future__ import print_function
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Dropout
-from keras.layers import LSTM
+from keras.layers import LSTM, GRU, SimpleRNN
 from keras.optimizers import RMSprop
 from keras.utils.data_utils import get_file
 import numpy as np
@@ -23,6 +23,30 @@ from layers import RHN
 import uuid
 import os
 import cPickle as pickle
+import argparse
+
+parser = argparse.ArgumentParser(description='Text generation toy example.')
+parser.add_argument('--maxlen', type=int, default=40)
+parser.add_argument('--step', type=int, default=3)
+parser.add_argument('--layer', type=str, choices=['lstm', 'rhn', 'rnn',
+                                                  'gru'], default='lstm')
+parser.add_argument('--nb_layers', type=int, default=1)
+parser.add_argument('--layer_norm', action='store_true', default=False)
+parser.add_argument('-o', '--output_dim', type=int, default=128)
+parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--nb_epoch', type=int, default=10)
+parser.add_argument('--nb_outer_it', type=int, default=6)
+
+args = parser.parse_args()
+
+if args.layer == 'lstm':
+    RNN = LSTM
+elif args.layer == 'gru':
+    RNN = GRU
+elif args.layer == 'rnn':
+    RNN = SimpleRNN
+elif args.layer == 'rhn':
+    RNN = RHN
 
 path = get_file('nietzsche.txt', origin="https://s3.amazonaws.com/text-datasets/nietzsche.txt")
 text = open(path).read().lower()
@@ -34,8 +58,9 @@ char_indices = dict((c, i) for i, c in enumerate(chars))
 indices_char = dict((i, c) for i, c in enumerate(chars))
 
 # cut the text in semi-redundant sequences of maxlen characters
-maxlen = 40
-step = 3
+maxlen = args.maxlen
+step = args.step
+
 sentences = []
 next_chars = []
 for i in range(0, len(text) - maxlen, step):
@@ -55,7 +80,15 @@ for i, sentence in enumerate(sentences):
 # build the model: a single LSTM
 print('Build model...')
 model = Sequential()
-model.add(RHN(2, input_shape=(maxlen, len(chars)), layer_norm=True))
+
+if args.layer == 'rhn':
+    model.add(RHN(args.output_dim, input_shape=(maxlen, len(chars)),
+                  layer_norm=args.layer_norm), nb_layers=args.nb_layers)
+else:
+    model.add(RNN(args.output_dim, input_shape=(maxlen, len(chars))))
+    for l in xrange(args.nb_layers-1):
+        model.add(RNN(args.output_dim))
+
 model.add(Dense(len(chars)))
 model.add(Activation('softmax'))
 
@@ -74,8 +107,8 @@ def sample(preds, temperature=1.0):
 
 # train the model, output generated text after each iteration
 history = []
-for _ in xrange(2):
-    his = model.fit(X, y, batch_size=128, nb_epoch=1)
+for _ in xrange(args.nb_outer_it):
+    his = model.fit(X, y, batch_size=args.batch_size, nb_epoch=args.nb_epoch)
     his = his.history
 
     start_index = random.randint(0, len(text) - maxlen - 1)
@@ -104,11 +137,15 @@ for _ in xrange(2):
         his['diversity_%.1f' % diversity] = generated
 
     history.append(his)
+
+meta = {'history': history, 'params': vars(args)}
+
 if not os.path.isdir('results'):
     os.makedirs('results')
+
 name = os.path.join('results', str(uuid.uuid1()))
 print('Saving at ./%s' % name)
 with open(name, 'wb') as f:
-    pickle.dump(history, f)
+    pickle.dump(meta, f)
 
 model.save('%s.h5' % name)
