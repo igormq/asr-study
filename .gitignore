@@ -190,3 +190,5 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# My ignores
+timit
