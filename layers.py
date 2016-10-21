@@ -210,14 +210,13 @@ class RHN(Recurrent):
 
     def step(self, x, states):
         s_tm1 = states[0]
-        B_U_W = states[1]
 
         for layer in xrange(self.nb_layers):
-            B_U = B_U_W[layer][0]
+            B_U = states[layer + 1][0]
             U, b = self.Us[layer], self.bs[layer]
 
             if layer == 0:
-                B_W = B_U_W[layer][1]
+                B_W = states[layer + 1][1]
                 a = K.dot(x * B_W, self.W) + K.dot(s_tm1 * B_U, U) + b
             else:
                 a = K.dot(s_tm1 * B_U, U) + b
@@ -262,10 +261,10 @@ class RHN(Recurrent):
             if 0 < self.dropout_U < 1:
                 ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
                 ones = K.tile(ones, (1, self.output_dim))
-                B_U = [K.in_train_phase(K.dropout(ones, self.dropout_U), ones) for _ in range(2 + (not self.coupling))]
+                B_U = K.in_train_phase(K.dropout(ones, self.dropout_U), ones)
                 constant.append(B_U)
             else:
-                constant.append([K.cast_to_floatx(1.) for _ in range(2 + (not self.coupling))])
+                constant.append(K.cast_to_floatx(1.))
 
             if layer == 0:
                 if 0 < self.dropout_W < 1:
@@ -273,10 +272,10 @@ class RHN(Recurrent):
                     input_dim = input_shape[-1]
                     ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
                     ones = K.tile(ones, (1, input_dim))
-                    B_W = [K.in_train_phase(K.dropout(ones, self.dropout_W), ones) for _ in range(2 + (not self.coupling))]
+                    B_W = K.in_train_phase(K.dropout(ones, self.dropout_W), ones)
                     constant.append(B_W)
                 else:
-                    constant.append([K.cast_to_floatx(1.) for _ in range(2 + (not self.coupling))])
+                    constant.append(K.cast_to_floatx(1.))
 
             constants.append(constant)
 
