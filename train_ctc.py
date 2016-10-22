@@ -1,5 +1,4 @@
-# import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = ''
+import os
 
 import tensorflow as tf
 # Import CTC loss
@@ -13,7 +12,9 @@ print('Using tf ctc :(')
 import numpy as np
 import librosa
 from scipy import sparse
+import argparse
 import h5py
+import uuid
 
 import keras
 import keras.backend as K
@@ -52,14 +53,44 @@ def ctc_lambda_func(args):
 
 if __name__ == '__main__':
 
-    label_type = 'phn'
+    parser = argparse.ArgumentParser(description='CTC Models training with TIMIT dataset')
+    parser.add_argument('--layer', type=str, choices=['lstm', 'rhn', 'rnn',
+                                                      'gru'], default='lstm')
+    parser.add_argument('--nb_layers', type=int, default=3)
+    parser.add_argument('--layer_norm', action='store_true', default=False)
+    parser.add_argument('--nb_hidden', type=int, default=250)
+    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--nb_epoch', type=int, default=250)
+    parser.add_argument('--label_type', type=str, choices=['phn', 'char'], default='phn')
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--clipnorm', type=float, default=10.)
+    parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--gpu', default='0')
+
+    args = parser.parse_args()
+
+    config = tf.ConfigProto()
+    config.gpu_options.visible_device_list = args.gpu
+    session = tf.Session(config=config)
+    K.set_session(session)
+
+
+    if args.layer == 'lstm':
+        RNN = LSTM
+    elif args.layer == 'gru':
+        RNN = GRU
+    elif args.layer == 'rnn':
+        RNN = SimpleRNN
+    elif args.layer == 'rhn':
+        RNN = RHN
+
     # Read dataset
     with h5py.File('timit.h5', 'r') as f:
-        X, seq_len, y = get_from_h5(f, 'train', label_type=label_type)
-        X_valid, seq_len_valid, y_valid = get_from_h5(f, 'valid', label_type=label_type)
-        X_test, seq_len_test, y_test = get_from_h5(f, 'test', label_type=label_type)
+        X, seq_len, y = get_from_h5(f, 'train', label_type=args.label_type)
+        X_valid, seq_len_valid, y_valid = get_from_h5(f, 'valid', label_type=args.label_type)
+        X_test, seq_len_test, y_test = get_from_h5(f, 'test', label_type=args.label_type)
 
-    if label_type == 'phn':
+    if args.label_type == 'phn':
         _, dict_label = get_phn_map('timit/phones.60-48-39.map')
     else:
         dict_label = get_char_map()
@@ -77,11 +108,14 @@ if __name__ == '__main__':
     input_length = Input(name='input_length', shape=(None,), dtype='int32')
 
     # Define model
-    nb_hidden = int(np.ceil(250*np.sqrt(2)))
-    o = RHN(nb_hidden, nb_layers=2, return_sequences=True, layer_norm=True)(x)
-    # o = LSTM(250, return_sequences=True)(x)
-    # o = LSTM(250, return_sequences=True)(o)
-    # o = LSTM(250, return_sequences=True)(o)
+    o = x
+    if args.layer == 'rhn':
+        o = RHN(args.nb_hidden, nb_layers=args.nb_layers,
+                return_sequences=True, layer_norm=args.layer_norm)(o)
+    else:
+        for l in xrange(args.nb_layers):
+            o = RNN(args.nb_hidden, return_sequences=True)(o)
+
     o = TimeDistributed(Dense(nb_classes))(o)
     # Define loss as a layer
     l = ctc([o, labels, input_length])
@@ -90,12 +124,24 @@ if __name__ == '__main__':
     pred = Model(input=x, output=o)
 
     # Optimization
-    # opt = RMSprop(lr=0.001, clipnorm=10)
-    opt = SGD(lr=1e-5, momentum=0.9, clipnorm=10.)
+    opt = SGD(lr=args.lr, momentum=args.momentum, clipnorm=args.clipnorm)
     # Compile with dummy loss
     model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=opt)
 
-    # FITZERA PESADAO
-    model.fit([X, y, seq_len], np.zeros((X.shape[0],)),
-              batch_size=64, nb_epoch=10,
-              validation_data=([X_valid, y_valid, seq_len_valid], np.zeros((X_valid.shape[0],))))
+    #  Fit the model
+    history = model.fit([X, y, seq_len], np.zeros((X.shape[0],)),
+                        batch_size=args.batch_size, nb_epoch=args.nb_epoch,
+                        validation_data=([X_valid, y_valid, seq_len_valid],
+                                         np.zeros((X_valid.shape[0],))))
+
+    meta = {'history': history.history, 'params': vars(args)}
+
+    if not os.path.isdir('results'):
+        os.makedirs('results')
+
+    name = os.path.join('results', str(uuid.uuid1()))
+    print('Saving at ./%s' % name)
+    with open(name, 'wb') as f:
+        pickle.dump(meta, f)
+
+    model.save('%s.h5' % name)
