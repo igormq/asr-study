@@ -176,8 +176,10 @@ class RHN(Recurrent):
             self.ln_weights = []
             ln_names = ['h', 't', 'c']
             for l in xrange(self.nb_layers):
-                ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
-                ln_biases = [self.ln_bias_init((self.output_dim,), name='%s_%d_ln_bias_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
+                # ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
+                ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(1)]
+                # ln_biases = [self.ln_bias_init((self.output_dim,), name='%s_%d_ln_bias_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
+                ln_biases = [self.ln_bias_init((self.output_dim,), name='%s_%d_ln_bias_%s' %(self.name, l, ln_names[i])) for i in xrange(1)]
                 self.ln_weights.append([ln_gains, ln_biases])
                 self.trainable_weights += ln_gains + ln_biases
 
@@ -233,9 +235,9 @@ class RHN(Recurrent):
             if self.has_layer_norm:
                 ln_gains, ln_biases = self.ln_weights[layer]
                 a0 = layer_normalization(a0, ln_gains[0], ln_biases[0])
-                a1 = layer_normalization(a1, ln_gains[1], ln_biases[1])
-                if not self.coupling:
-                    a2 = layer_normalization(a2, ln_gains[2], ln_biases[2])
+                # a1 = layer_normalization(a1, ln_gains[1], ln_biases[1])
+                # if not self.coupling:
+                #     a2 = layer_normalization(a2, ln_gains[2], ln_biases[2])
 
             # Equation 7
             h =  self.activation(a0)
