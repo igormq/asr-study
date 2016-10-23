@@ -15,6 +15,7 @@ from scipy import sparse
 import argparse
 import h5py
 import uuid
+import cPickle as pickle
 
 import keras
 import keras.backend as K
