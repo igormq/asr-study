@@ -1,4 +1,7 @@
+import sys
 import os
+
+sys.path = [os.path.join('keras')] + sys.path
 
 import tensorflow as tf
 # Import CTC loss
@@ -26,6 +29,27 @@ from keras.utils.data_utils import get_file
 from layers import RHN
 
 from preprocess_timit import get_char_map, get_phn_map
+
+def ler(y_true, y_pred, **kwargs):
+    return tf.reduce_mean(tf.edit_distance(y_pred, y_true, **kwargs))
+
+def decode(inputs, **kwargs):
+    is_greedy = kwargs.get('is_greedy', True)
+    y_pred, seq_len = inputs
+
+    seq_len = tf.cast(seq_len[:, 0], tf.int32)
+    y_pred = tf.transpose(y_pred, perm=[1, 0, 2])
+
+    if is_greedy:
+        decoded = tf.nn.ctc_greedy_decoder(y_pred, seq_len)[0][0]
+    else:
+        decoded = tf.nn.ctc_beam_search_decoder(y_pred, seq_len)[0][0]
+
+    return decoded
+
+def decode_output_shape(inputs_shape):
+    y_pred_shape, seq_len_shape = inputs_shape
+    return (y_pred_shape[:1], None)
 
 def get_inv_dict(dict_label):
     inv_dict = {v: k for (k, v) in dict_label.iteritems()}
@@ -66,15 +90,20 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--clipnorm', type=float, default=10.)
     parser.add_argument('--momentum', type=float, default=0.9)
-    parser.add_argument('--gpu', default='0')
+    parser.add_argument('--gpu', default='0', type=str)
 
     args = parser.parse_args()
 
-    config = tf.ConfigProto()
-    config.gpu_options.visible_device_list = args.gpu
+    if args.gpu == '-1':
+        config = tf.ConfigProto(device_count = {'GPU': 0})
+    else:
+        if args.gpu == 'all':
+            args.gpu = ''
+        config = tf.ConfigProto()
+        config.gpu_options.visible_device_list = args.gpu
+
     session = tf.Session(config=config)
     K.set_session(session)
-
 
     if args.layer == 'lstm':
         RNN = LSTM
@@ -102,6 +131,8 @@ if __name__ == '__main__':
     nb_classes = len(inv_dict)
 
     ctc = Lambda(ctc_lambda_func, output_shape=(1,), name="ctc")
+    dec = Lambda(decode, output_shape=decode_output_shape,
+                 arguments={'is_greedy': True}, name='decoder')
 
     # Define placeholders
     x = Input(name='input', shape=(None, nb_features))
@@ -120,20 +151,31 @@ if __name__ == '__main__':
     o = TimeDistributed(Dense(nb_classes))(o)
     # Define loss as a layer
     l = ctc([o, labels, input_length])
+    y_pred = dec([o, input_length])
 
-    model = Model(input=[x, labels, input_length], output=l)
-    pred = Model(input=x, output=o)
+    model = Model(input=[x, labels, input_length], output=[l, y_pred])
+    # model = Model(input=[x, labels, input_length], output=l)
 
     # Optimization
     opt = SGD(lr=args.lr, momentum=args.momentum, clipnorm=args.clipnorm)
+
     # Compile with dummy loss
-    model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=opt)
+    model.compile(loss={'ctc': lambda y_true, y_pred: y_pred,
+                        'decoder': lambda y_true, y_pred: K.zeros((1,))},
+                  optimizer=opt, metrics={'decoder': ler},
+                  loss_weights=[1, 0])
+    # model.compile(loss={'ctc': lambda y_true, y_pred: y_pred},
+    #               optimizer=opt)
 
     #  Fit the model
-    history = model.fit([X, y, seq_len], np.zeros((X.shape[0],)),
+    history = model.fit([X, y, seq_len], [np.zeros((X.shape[0],)), y],
                         batch_size=args.batch_size, nb_epoch=args.nb_epoch,
                         validation_data=([X_valid, y_valid, seq_len_valid],
-                                         np.zeros((X_valid.shape[0],))))
+                                         [np.zeros((X_valid.shape[0],)), y_valid]))
+    # history = model.fit([X, y, seq_len], np.zeros((X.shape[0],)),
+    #                     batch_size=args.batch_size, nb_epoch=args.nb_epoch,
+    #                     validation_data=([X_valid, y_valid, seq_len_valid],
+    #                                      np.zeros((X_valid.shape[0],))))
 
     meta = {'history': history.history, 'params': vars(args)}
 
