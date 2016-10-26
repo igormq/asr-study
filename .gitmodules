@@ -1,0 +1,3 @@
+[submodule "keras"]
+	path = keras
+	url = https://github.com/fchollet/keras.git
