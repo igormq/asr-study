@@ -292,7 +292,7 @@ class RHN(Recurrent):
                   'activation': self.activation.__name__,
                   'inner_activation': self.inner_activation.__name__,
                   'coupling': self.coupling,
-                  'has_layer_norm': self.has_layer_norm,
+                  'layer_norm': self.has_layer_norm,
                   'ln_gain_init': self.ln_gain_init.__name__,
                   'ln_bias_init': self.ln_bias_init.__name__,
                   'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
