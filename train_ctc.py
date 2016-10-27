@@ -1,5 +1,6 @@
 import sys
 import os
+import yaml
 
 sys.path = [os.path.join('keras')] + sys.path
 
@@ -22,6 +23,7 @@ import cPickle as pickle
 
 import keras
 import keras.backend as K
+from keras.callbacks import Callback, ModelCheckpoint
 from keras.models import Model
 from keras.layers import Input, Dense, Activation, Lambda, TimeDistributed, LSTM
 from keras.optimizers import RMSprop, SGD
@@ -34,6 +36,7 @@ def ler(y_true, y_pred, **kwargs):
     return tf.reduce_mean(tf.edit_distance(y_pred, y_true, **kwargs))
 
 def decode(inputs, **kwargs):
+    import tensorflow as tf
     is_greedy = kwargs.get('is_greedy', True)
     y_pred, seq_len = inputs
 
@@ -74,7 +77,82 @@ def get_from_h5(h5_file, dataset, label_type='phn'):
 
 def ctc_lambda_func(args):
     y_pred, labels, input_length = args
-    return ctc_loss(tf.transpose(y_pred, perm=[1, 0, 2]), labels, input_length[:, 0])
+    import tensorflow as tf
+    return tf.nn.ctc_loss(tf.transpose(y_pred, perm=[1, 0, 2]), labels, input_length[:, 0])
+
+def ctc_dummy_loss(y_true, y_pred):
+    return y_pred
+
+def decoder_dummy_loss(y_true, y_pred):
+    return K.zeros((1,))
+
+def treta_loader(treta_path):
+    keras.metrics.ler = ler
+    keras.objectives.decoder_dummy_loss = decoder_dummy_loss
+    keras.objectives.ctc_dummy_loss = ctc_dummy_loss
+    from layers import RHN, highway_bias_initializer
+    keras.initializations.highway_bias_initializer = highway_bias_initializer
+    modelin = keras.models.load_model(treta_path, custom_objects={'RHN':RHN})
+    return modelin
+
+class MetaCheckpoint(Callback):
+    '''
+    Checkpoints some training information on a meta file. Together with the
+    Keras model saving, this should enable resuming training and having training
+    information on every checkpoint.
+    '''
+
+    def __init__(self, filepath, schedule=None, training_args=None):
+        self.filepath = filepath
+        self.meta = {'epoch': []}
+        if schedule:
+            self.meta['schedule'] = schedule.get_config()
+        if training_args:
+            self.meta['training_args'] = training_args
+
+    def on_train_begin(self, logs={}):
+        self.epoch_offset = len(self.meta['epoch'])
+
+    def on_epoch_end(self, epoch, logs={}):
+        # Get statistics
+        self.meta['epoch'].append(epoch + self.epoch_offset)
+        for k, v in logs.items():
+            # Get default gets the value or sets (and gets) the default value
+            self.meta.setdefault(k, []).append(v)
+
+        # Save to file
+        filepath = self.filepath.format(epoch=epoch, **logs)
+
+        with open(filepath, 'wb') as f:
+            yaml.dump(self.meta, f)
+
+
+def ctc_model(nb_features, nb_hidden, nb_layers, layer_norm, nb_classes, dropout):
+    ctc = Lambda(ctc_lambda_func, output_shape=(1,), name="ctc")
+    dec = Lambda(decode, output_shape=decode_output_shape,
+                 arguments={'is_greedy': True}, name='decoder')
+
+    # Define placeholders
+    x = Input(name='input', shape=(None, nb_features))
+    labels = Input(name='labels', shape=(None,), dtype='int32', sparse=True)
+    input_length = Input(name='input_length', shape=(None,), dtype='int32')
+
+    # Define model
+    o = x
+    if args.layer == 'rhn':
+        o = RHN(nb_hidden, nb_layers=nb_layers,
+                return_sequences=True, layer_norm=layer_norm, dropout_W=dropout, dropout_U=dropout)(o)
+    else:
+        for l in xrange(args.nb_layers):
+            o = RNN(nb_hidden, return_sequences=True, consume_less='gpu', dropout_W=dropout, dropout_U=dropout)(o)
+
+    o = TimeDistributed(Dense(nb_classes))(o)
+    # Define loss as a layer
+    l = ctc([o, labels, input_length])
+    y_pred = dec([o, input_length])
+
+    model = Model(input=[x, labels, input_length], output=[l, y_pred])
+    return model
 
 if __name__ == '__main__':
 
@@ -91,7 +169,9 @@ if __name__ == '__main__':
     parser.add_argument('--clipnorm', type=float, default=10.)
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--gpu', default='0', type=str)
-
+    parser.add_argument('--dropout', default=0., type=float)
+    parser.add_argument('--save', default=os.path.join('results', str(uuid.uuid1())), type=str)
+    parser.add_argument('--load', default=None)
     args = parser.parse_args()
 
     if args.gpu == '-1':
@@ -104,15 +184,6 @@ if __name__ == '__main__':
 
     session = tf.Session(config=config)
     K.set_session(session)
-
-    if args.layer == 'lstm':
-        RNN = LSTM
-    elif args.layer == 'gru':
-        RNN = GRU
-    elif args.layer == 'rnn':
-        RNN = SimpleRNN
-    elif args.layer == 'rhn':
-        RNN = RHN
 
     # Read dataset
     with h5py.File('timit.h5', 'r') as f:
@@ -130,61 +201,51 @@ if __name__ == '__main__':
     nb_features = X.shape[2]
     nb_classes = len(inv_dict)
 
-    ctc = Lambda(ctc_lambda_func, output_shape=(1,), name="ctc")
-    dec = Lambda(decode, output_shape=decode_output_shape,
-                 arguments={'is_greedy': True}, name='decoder')
+    if args.layer == 'lstm':
+        RNN = LSTM
+    elif args.layer == 'gru':
+        RNN = GRU
+    elif args.layer == 'rnn':
+        RNN = SimpleRNN
+    elif args.layer == 'rhn':
+        RNN = RHN
 
-    # Define placeholders
-    x = Input(name='input', shape=(None, nb_features))
-    labels = Input(name='labels', shape=(None,), dtype='int32', sparse=True)
-    input_length = Input(name='input_length', shape=(None,), dtype='int32')
-
-    # Define model
-    o = x
-    if args.layer == 'rhn':
-        o = RHN(args.nb_hidden, nb_layers=args.nb_layers,
-                return_sequences=True, layer_norm=args.layer_norm)(o)
+    if args.load is None:
+        model = ctc_model(nb_features, args.nb_hidden, args.nb_layers, args.layer_norm, nb_classes, args.dropout)
     else:
-        for l in xrange(args.nb_layers):
-            o = RNN(args.nb_hidden, return_sequences=True)(o)
-
-    o = TimeDistributed(Dense(nb_classes))(o)
-    # Define loss as a layer
-    l = ctc([o, labels, input_length])
-    y_pred = dec([o, input_length])
-
-    model = Model(input=[x, labels, input_length], output=[l, y_pred])
-    # model = Model(input=[x, labels, input_length], output=l)
+        model = treta_loader(args.load)
 
     # Optimization
     opt = SGD(lr=args.lr, momentum=args.momentum, clipnorm=args.clipnorm)
 
     # Compile with dummy loss
-    model.compile(loss={'ctc': lambda y_true, y_pred: y_pred,
-                        'decoder': lambda y_true, y_pred: K.zeros((1,))},
+    model.compile(loss={'ctc': ctc_dummy_loss,
+                        'decoder': decoder_dummy_loss},
                   optimizer=opt, metrics={'decoder': ler},
                   loss_weights=[1, 0])
-    # model.compile(loss={'ctc': lambda y_true, y_pred: y_pred},
-    #               optimizer=opt)
+
+
+    # Define callbacks
+    name = args.save
+    if not os.path.isdir(name):
+        os.makedirs(name)
+
+    meta_ckpt = MetaCheckpoint(os.path.join(name, 'meta.yaml'), training_args=vars(args))
+    model_ckpt = ModelCheckpoint(os.path.join(name, 'model.h5'))
+    best_ckpt = ModelCheckpoint(os.path.join(name, 'best.h5'), monitor='val_decoder_ler', save_best_only=True, mode='min')
+    callback_list = [meta_ckpt, model_ckpt, best_ckpt]
 
     #  Fit the model
-    history = model.fit([X, y, seq_len], [np.zeros((X.shape[0],)), y],
-                        batch_size=args.batch_size, nb_epoch=args.nb_epoch,
-                        validation_data=([X_valid, y_valid, seq_len_valid],
-                                         [np.zeros((X_valid.shape[0],)), y_valid]))
+    model.fit([X, y, seq_len], [np.zeros((X.shape[0],)), y],
+              batch_size=args.batch_size, nb_epoch=args.nb_epoch,
+              validation_data=([X_valid, y_valid, seq_len_valid],
+                               [np.zeros((X_valid.shape[0],)), y_valid]),
+              callbacks=callback_list, shuffle=True)
+
     # history = model.fit([X, y, seq_len], np.zeros((X.shape[0],)),
     #                     batch_size=args.batch_size, nb_epoch=args.nb_epoch,
     #                     validation_data=([X_valid, y_valid, seq_len_valid],
     #                                      np.zeros((X_valid.shape[0],))))
 
-    meta = {'history': history.history, 'params': vars(args)}
 
-    if not os.path.isdir('results'):
-        os.makedirs('results')
-
-    name = os.path.join('results', str(uuid.uuid1()))
-    print('Saving at ./%s' % name)
-    with open(name, 'wb') as f:
-        pickle.dump(meta, f)
-
-    model.save('%s.h5' % name)
+    # meta = {'history': history.history, 'params': vars(args)}
