@@ -25,12 +25,15 @@ import keras
 import keras.backend as K
 from keras.callbacks import Callback, ModelCheckpoint
 from keras.models import Model
-from keras.layers import Input, Dense, Activation, Lambda, TimeDistributed, LSTM
+from keras.layers import Input, Dense, Activation, Lambda, TimeDistributed, LSTM, Bidirectional
 from keras.optimizers import RMSprop, SGD
 from keras.utils.data_utils import get_file
 from layers import RHN
 
 from preprocess_timit import get_char_map, get_phn_map
+
+from layers import highway_bias_initializer
+keras.initializations.highway_bias_initializer = highway_bias_initializer
 
 def ler(y_true, y_pred, **kwargs):
     return tf.reduce_mean(tf.edit_distance(y_pred, y_true, **kwargs))
@@ -127,7 +130,7 @@ class MetaCheckpoint(Callback):
             yaml.dump(self.meta, f)
 
 
-def ctc_model(nb_features, nb_hidden, nb_layers, layer_norm, nb_classes, dropout):
+def ctc_model(nb_features, nb_hidden, nb_layers, layer_norm, nb_classes, dropout, bidirectional, depth):
     ctc = Lambda(ctc_lambda_func, output_shape=(1,), name="ctc")
     dec = Lambda(decode, output_shape=decode_output_shape,
                  arguments={'is_greedy': True}, name='decoder')
@@ -138,13 +141,17 @@ def ctc_model(nb_features, nb_hidden, nb_layers, layer_norm, nb_classes, dropout
     input_length = Input(name='input_length', shape=(None,), dtype='int32')
 
     # Define model
-    o = x
-    if args.layer == 'rhn':
-        o = RHN(nb_hidden, nb_layers=nb_layers,
-                return_sequences=True, layer_norm=layer_norm, dropout_W=dropout, dropout_U=dropout)(o)
-    else:
-        for l in xrange(args.nb_layers):
-            o = RNN(nb_hidden, return_sequences=True, consume_less='gpu', dropout_W=dropout, dropout_U=dropout)(o)
+    for l in xrange(args.nb_layers):
+        if args.layer == 'rhn':
+            rnn = RHN(nb_hidden, depth=depth,
+                    return_sequences=True, layer_norm=layer_norm, dropout_W=dropout, dropout_U=dropout)
+        else:
+            rnn = RNN(nb_hidden, return_sequences=True, consume_less='gpu', dropout_W=dropout, dropout_U=dropout)
+
+        if bidirectional:
+            o = Bidirectional(rnn)(o)
+        else:
+            o = rnn(o)
 
     o = TimeDistributed(Dense(nb_classes))(o)
     # Define loss as a layer
@@ -160,7 +167,9 @@ if __name__ == '__main__':
     parser.add_argument('--layer', type=str, choices=['lstm', 'rhn', 'rnn',
                                                       'gru'], default='lstm')
     parser.add_argument('--nb_layers', type=int, default=3)
+    parser.add_argument('--depth', type=int, default=1)
     parser.add_argument('--layer_norm', action='store_true', default=False)
+    parser.add_argument('--bi', action='store_true', default=False)
     parser.add_argument('--nb_hidden', type=int, default=250)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--nb_epoch', type=int, default=250)
@@ -211,7 +220,7 @@ if __name__ == '__main__':
         RNN = RHN
 
     if args.load is None:
-        model = ctc_model(nb_features, args.nb_hidden, args.nb_layers, args.layer_norm, nb_classes, args.dropout)
+        model = ctc_model(nb_features, args.nb_hidden, args.nb_layers, args.layer_norm, nb_classes, args.dropout, args.bi, args.depth)
     else:
         model = treta_loader(args.load)
 

@@ -89,6 +89,7 @@ class RHN(Recurrent):
     [this paper](https://arxiv.org/abs/1607.03474).
     # Arguments
         output_dim: dimension of the internal projections and the final output.
+        depth: recurrency depth size.
         init: weight initialization function.
             Can be the name of an existing function (str),
             or a Theano function (see: [initializations](../initializations.md)).
@@ -116,7 +117,7 @@ class RHN(Recurrent):
         - [A Theoretically Grounded Application of Dropout in Recurrent Neural Networks](http://arxiv.org/abs/1512.05287)
     # TODO: different dropout rates for each layer
     '''
-    def __init__(self, output_dim, nb_layers=1,
+    def __init__(self, output_dim, depth=1,
                  init='glorot_uniform', inner_init='orthogonal',
                  bias_init=highway_bias_initializer,
                  activation='tanh', inner_activation='hard_sigmoid',
@@ -124,7 +125,7 @@ class RHN(Recurrent):
                  W_regularizer=None, U_regularizer=None,
                  b_regularizer=None, dropout_W=0., dropout_U=0., **kwargs):
         self.output_dim = output_dim
-        self.nb_layers = nb_layers
+        self.depth = depth
         self.init = initializations.get(init)
         self.inner_init = initializations.get(inner_init)
         self.bias_init = initializations.get(bias_init)
@@ -160,7 +161,7 @@ class RHN(Recurrent):
         self.W = self.init((self.input_dim, (2 + (not self.coupling)) * self.output_dim),
                            name='{}_W'.format(self.name))
         self.Us = [self.inner_init((self.output_dim, (2 + (not self.coupling)) * self.output_dim),
-                                    name='%s_%d_U' %(self.name, i)) for i in xrange(self.nb_layers)]
+                                    name='%s_%d_U' %(self.name, i)) for i in xrange(self.depth)]
 
         bias_init_value = K.get_value(self.bias_init((self.output_dim,)))
         b = [np.zeros(self.output_dim),
@@ -169,13 +170,13 @@ class RHN(Recurrent):
         if not self.coupling:
             b.append(np.copy(bias_init_value))
 
-        self.bs = [K.variable(np.hstack(b), name='%s_%d_b' %(self.name, i)) for i in xrange(self.nb_layers)]
+        self.bs = [K.variable(np.hstack(b), name='%s_%d_b' %(self.name, i)) for i in xrange(self.depth)]
 
         self.trainable_weights = [self.W] + self.Us +  self.bs
         if self.has_layer_norm:
             self.ln_weights = []
             ln_names = ['h', 't', 'c']
-            for l in xrange(self.nb_layers):
+            for l in xrange(self.depth):
                 # ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
                 ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(1)]
                 # ln_biases = [self.ln_bias_init((self.output_dim,), name='%s_%d_ln_bias_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
@@ -213,7 +214,7 @@ class RHN(Recurrent):
     def step(self, x, states):
         s_tm1 = states[0]
 
-        for layer in xrange(self.nb_layers):
+        for layer in xrange(self.depth):
             B_U = states[layer + 1][0]
             U, b = self.Us[layer], self.bs[layer]
 
@@ -258,7 +259,7 @@ class RHN(Recurrent):
     def get_constants(self, x):
         constants = []
 
-        for layer in xrange(self.nb_layers):
+        for layer in xrange(self.depth):
             constant = []
             if 0 < self.dropout_U < 1:
                 ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
@@ -285,7 +286,7 @@ class RHN(Recurrent):
 
     def get_config(self):
         config = {'output_dim': self.output_dim,
-                  'nb_layers': self.nb_layers,
+                  'depth': self.depth,
                   'init': self.init.__name__,
                   'inner_init': self.inner_init.__name__,
                   'bias_init': self.bias_init.__name__,
@@ -309,5 +310,5 @@ if __name__ == "__main__":
     from keras.utils.visualize_util import plot
 
     model = Sequential()
-    model.add(RHN(10, input_dim=2, nb_layers=2, layer_norm=True))
+    model.add(RHN(10, input_dim=2, depth=2, layer_norm=True))
     # plot(model)
