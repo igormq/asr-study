@@ -12,12 +12,31 @@ import warnings
 def highway_bias_initializer(shape, name=None):
     return -2*initializations.one(shape, name=name)
 
-
 def layer_normalization(x, gain, bias, epsilon=1e-5):
     m = K.mean(x, axis=-1, keepdims=True)
     std = K.std(x, axis=-1, keepdims=True)
     x_normed = (x - m) / (std + epsilon) * gain + bias
     return x_normed
+
+def multiplicative_integration_init(shape, alpha_init='one',
+                                     beta1_init='one', beta2_init='one', name='mi', has_input=True):
+
+    beta1 = initializations.get(beta1_init)(shape, name='%s_beta1' %name)
+    if has_input:
+        alpha = initializations.get(alpha_init)(shape, name='%s_alpha' %name)
+        beta2 = initializations.get(beta2_init)(shape, name='%s_beta2' %name)
+        return alpha, beta1, beta2
+
+    return beta1
+
+def multiplicative_integration(Wx, Uz, params, has_input=True):
+    if has_input:
+        alpha, beta1, beta2 = params
+        return alpha*Wx*Uz +  beta1*Uz + beta2*Wx
+
+    beta1 = params
+    return beta1*Uz
+
 
 class LayerNormalization(Layer):
     '''Normalize from all of the summed inputs to the neurons in a layer on
@@ -121,7 +140,7 @@ class RHN(Recurrent):
                  init='glorot_uniform', inner_init='orthogonal',
                  bias_init=highway_bias_initializer,
                  activation='tanh', inner_activation='hard_sigmoid',
-                 coupling=True, layer_norm=False, ln_gain_init='one', ln_bias_init='zero',
+                 coupling=True, layer_norm=False, ln_gain_init='one', ln_bias_init='zero', mi=False,
                  W_regularizer=None, U_regularizer=None,
                  b_regularizer=None, dropout_W=0., dropout_U=0., **kwargs):
         self.output_dim = output_dim
@@ -135,6 +154,7 @@ class RHN(Recurrent):
         self.has_layer_norm = layer_norm
         self.ln_gain_init = initializations.get(ln_gain_init)
         self.ln_bias_init = initializations.get(ln_bias_init)
+        self.mi = mi
         self.W_regularizer = regularizers.get(W_regularizer)
         self.U_regularizer = regularizers.get(U_regularizer)
         self.b_regularizer = regularizers.get(b_regularizer)
@@ -173,6 +193,16 @@ class RHN(Recurrent):
         self.bs = [K.variable(np.hstack(b), name='%s_%d_b' %(self.name, i)) for i in xrange(self.depth)]
 
         self.trainable_weights = [self.W] + self.Us +  self.bs
+
+        if self.mi:
+            self.mi_params = [multiplicative_integration_init(((2 + (not self.coupling))*self.output_dim,), name='%s_%d' %(self.name, i), has_input=(i==0)) for i in xrange(self.depth)]
+
+            for p in self.mi_params:
+                if type(p) in {list, tuple}:
+                    self.trainable_weights += p
+                else:
+                    self.trainable_weights += [p]
+
         if self.has_layer_norm:
             self.ln_weights = []
             ln_names = ['h', 't', 'c']
@@ -220,13 +250,16 @@ class RHN(Recurrent):
 
             if layer == 0:
                 B_W = states[layer + 1][1]
-                a = K.dot(x * B_W, self.W) + K.dot(s_tm1 * B_U, U) + b
+                Wx = K.dot(x * B_W, self.W)
             else:
-                a = K.dot(s_tm1 * B_U, U) + b
+                Wx = 0
 
-            # LN should be applied to all activation or only to activation?
-            # if self.has_layer_norm:
-                # a = self.layer_norm(a)
+            Us = K.dot(s_tm1 * B_U, U)
+
+            if self.mi:
+                a =  multiplicative_integration(Wx, Us, self.mi_params[layer]) + b
+            else:
+                a = Wx + Us + b
 
             a0 = a[:, :self.output_dim]
             a1 = a[:, self.output_dim: 2 * self.output_dim]
@@ -296,6 +329,7 @@ class RHN(Recurrent):
                   'layer_norm': self.has_layer_norm,
                   'ln_gain_init': self.ln_gain_init.__name__,
                   'ln_bias_init': self.ln_bias_init.__name__,
+                  'mi': self.mi,
                   'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
                   'U_regularizer': self.U_regularizer.get_config() if self.U_regularizer else None,
                   'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,

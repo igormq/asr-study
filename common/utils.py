@@ -1,0 +1,41 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import h5py
+import sys
+
+import numpy as np
+from scipy import sparse
+import keras
+
+import inspect
+
+import core
+
+def get_from_h5(h5_file, dataset, label_type='char'):
+    X = np.array(h5_file['%s/inputs/data' %dataset])
+    seq_len = np.array(h5_file['%s/inputs/seq_len' %dataset])
+
+    values = np.array(h5_file['%s/%s/values' %(dataset, label_type)])
+    indices = np.array(h5_file['%s/%s/indices' %(dataset, label_type)])
+    indices = (indices[:, 0], indices[:, 1])
+    shape = np.array(h5_file['%s/%s/shape' %(dataset, label_type)])
+
+    y = sparse.coo_matrix((values, indices), shape=shape).tolil()
+    return X, seq_len, y
+
+def get_functions_from_module(module):
+    return dict(inspect.getmembers(sys.modules[module], lambda member: inspect.isfunction(member) and member.__module__ == module))
+
+def get_custom_objects():
+    all_custom_objects = []
+
+    for module in ['core.layers', 'core.metrics', 'core.ctc_utils']:
+        all_custom_objects.extend(inspect.getmembers(sys.modules[module], lambda member: (inspect.isclass(member) or inspect.isfunction(member)) and member.__module__ == module))
+
+    return dict(all_custom_objects)
+
+def model_loader(treta_path):
+    modelin = keras.models.load_model(treta_path, custom_objects=get_custom_objects())
+    return modelin
