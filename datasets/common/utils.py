@@ -1,23 +1,9 @@
 from __future__ import absolute_import, division, print_function
 
-import h5py
 import json
-import librosa
 
 import codecs
 from unidecode import unidecode
-import string
-
-import argparse
-
-import numpy as np
-import time
-import re
-import os
-
-from preprocessing.audio import LogFbank, MFCC
-from datasets import DT_ABSPATH
-from datasets.common import utils
 
 def read_from_json(json_file):
     dataset = []
