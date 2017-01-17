@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 import keras
 import keras.backend as K
-from keras.optimizers import SGD
+from keras.optimizers import SGD, Adam
 from keras.callbacks import ModelCheckpoint
 
 from core import metrics
@@ -53,6 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--clipnorm', default=5, type=float)
     parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--opt', default='sgd', type=str, choices=['sgd', 'adam'])
 
     parser.add_argument('--save', default=os.path.join('results', str(uuid.uuid1())), type=str)
 
@@ -81,7 +82,10 @@ if __name__ == '__main__':
     model = valid_models[args.model](args.params)
 
     # Optimization
-    opt = SGD(lr=args.lr, momentum=args.momentum, clipnorm=args.clipnorm)
+    if args.opt == 'sgd':
+        opt = SGD(lr=args.lr, momentum=args.momentum, clipnorm=args.clipnorm)
+    elif args.opt == 'adam':
+        opt = Adam(lr=args.lr, clipnorm=args.clipnorm)
 
     # Compile with dummy loss
     model.compile(loss={'ctc': ctc_dummy_loss,
@@ -108,3 +112,5 @@ if __name__ == '__main__':
 
     # #  Fit the model
     model.fit_generator(data_gen.flow(X_train, y_train, batch_size=args.batch_size, seed=0), samples_per_epoch=len(X_train), nb_epoch=args.nb_epoch, validation_data=data_gen.flow(X_valid, y_valid, batch_size=args.batch_size, seed=0), nb_val_samples=len(X_valid), max_q_size=10, nb_worker=1, callbacks=callback_list, verbose=1)
+
+    metrics = model.evaluate_generator(data_gen.flow(X_test, y_test, batch_size=args.batch_size, seed=0), max_q_size=10, nb_worker=1)
