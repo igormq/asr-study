@@ -31,7 +31,7 @@ class FBank(Feature):
 
     def __init__(self, fs=16e3, win_len=0.025, win_step=0.01,
                  num_filt=40, nfft=512, low_freq=20, high_freq=7800,
-                 pre_emph=0.97, win_fun=signal.hamming):
+                 pre_emph=0.97, win_fun=signal.hamming, d=False, dd=False, eps=1e-14):
         """Constructor
         """
 
@@ -47,6 +47,7 @@ class FBank(Feature):
         self.high_freq = high_freq or self.fs/2
         self.pre_emph = pre_emph
         self.win_fun = win_fun
+        self.eps = eps
 
         self._filterbanks = self._get_filterbanks()
 
@@ -187,7 +188,7 @@ class MFCC(FBank):
         super(MFCC, self).__init__(fs=fs, win_len=win_len, win_step=win_step,
                                    num_filt=num_filt, nfft=nfft,
                                    low_freq=low_freq, high_freq=high_freq,
-                                   pre_emph=pre_emph, win_fun=win_fun)
+                                   pre_emph=pre_emph, win_fun=win_fun, eps=eps)
 
         self.num_cep = num_cep
         self.cep_lifter = cep_lifter
@@ -223,7 +224,7 @@ class MFCC(FBank):
 
         if self.append_energy:
             # replace first cepstral coefficient with log of frame energy
-            feat[:, 0] = np.log(energy + eps)
+            feat[:, 0] = np.log(energy + self.eps)
 
         return feat
 
@@ -247,6 +248,52 @@ class MFCC(FBank):
         else:
             # values of L <= 0, do nothing
             return cepstra
+
+class LogFbank(FBank):
+    """Compute Mel-filterbank energy features from an audio signal.
+    """
+
+    def __init__(self, fs=16e3, win_len=0.025, win_step=0.01,
+                 num_filt=40, nfft=512, low_freq=20, high_freq=7800,
+                 pre_emph=0.97, win_fun=signal.hamming, append_energy=False, d=True, dd=True):
+        """Constructor
+        """
+
+        super(LogFbank, self).__init__(fs=fs, win_len=win_len, win_step=win_step,
+                                   num_filt=num_filt, nfft=nfft,
+                                   low_freq=low_freq, high_freq=high_freq,
+                                   pre_emph=pre_emph, win_fun=win_fun)
+
+        self.d = d
+        self.dd = dd
+        self.append_energy = append_energy
+
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def __call__(self, signal):
+        """Compute log Mel-filterbank energy features from an audio signal.
+        :param signal: the audio signal from which to compute features. Should be an N*1 array
+
+        Returns:
+             A numpy array of size (NUMFRAMES by nfilt) containing features. Each row holds 1 feature vector.
+        """
+
+        feat, energy = super(LogFbank, self).__call__(signal)
+
+        feat = np.log(feat)
+
+        if self.append_energy:
+            feat = np.hstack([feat, np.log(energy + self.eps)[:, np.newaxis]])
+
+
+        if self.d:
+            d = delta(feat, 2)
+            feat = np.hstack([feat, d])
+
+            if self.dd:
+                feat = np.hstack([feat, delta(d, 2)])
+
+        return feat
 
 class Raw(Feature):
     def __init__(self, *args, **kwargs):
