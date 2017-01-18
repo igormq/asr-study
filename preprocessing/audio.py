@@ -1,4 +1,4 @@
-''' MFCC, FBank, LogFBank calculations were removed from python_speech_features package
+''' Code partially copied from python_speech_features package
 '''
 from __future__ import absolute_import
 from __future__ import division
@@ -31,7 +31,7 @@ class FBank(Feature):
 
     def __init__(self, fs=16e3, win_len=0.025, win_step=0.01,
                  num_filt=40, nfft=512, low_freq=20, high_freq=7800,
-                 pre_emph=0.97, win_fun=signal.hamming, d=False, dd=False, eps=1e-14):
+                 pre_emph=0.97, win_fun=signal.hamming, eps=1e-14):
         """Constructor
         """
 
@@ -155,7 +155,7 @@ class MFCC(FBank):
 
     def __init__(self, fs=16e3, win_len=0.025, win_step=0.01, num_cep=13,
                  num_filt=40, nfft=512, low_freq=20, high_freq=7800,
-                 pre_emph=0.97, cep_lifter=22, append_energy=False,
+                 pre_emph=0.97, cep_lifter=22, append_energy=True,
                  win_fun=signal.hamming, d=True, dd=True, eps=1e-14):
         """ Constructor of class
 
@@ -255,7 +255,7 @@ class LogFbank(FBank):
 
     def __init__(self, fs=16e3, win_len=0.025, win_step=0.01,
                  num_filt=40, nfft=512, low_freq=20, high_freq=7800,
-                 pre_emph=0.97, win_fun=signal.hamming, append_energy=False, d=True, dd=True):
+                 pre_emph=0.97, win_fun=signal.hamming, append_energy=False, d=False, dd=False):
         """Constructor
         """
 
