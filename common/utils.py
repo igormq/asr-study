@@ -25,6 +25,22 @@ def get_from_h5(h5_file, dataset, label_type='char'):
     y = sparse.coo_matrix((values, indices), shape=shape).tolil()
     return X, seq_len, y
 
+def safe_mkdirs(path):
+    ''' Safe makedirs
+    Directory is created with command `makedir -p`.
+    Returns:
+        `path` if the directory already exists or is created
+    Exception:
+        OSError if something is wrong
+    '''
+    try:
+        os.makedirs(path)
+    except OSError, e:
+        if e.errno != 17: # 17 = file exists
+            raise
+
+    return path
+
 def get_functions_from_module(module):
     return dict(inspect.getmembers(sys.modules[module], lambda member: inspect.isfunction(member) and member.__module__ == module))
 
