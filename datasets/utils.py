@@ -28,3 +28,10 @@ def read_from_json(json_file):
 
 def normalize_audio(input_list, mean, std):
     return [(i - mean)/std for i in input_list]
+
+
+def ldd2dl(ld):
+    '''Transform a list of dictionaries in a dictionaries with lists
+    NOTE: All dictionaries have the same keys
+    '''
+    return dict(zip(ld[0],zip(*[d.values() for d in ld])))
