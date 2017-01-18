@@ -12,33 +12,51 @@ import logging
 
 from scipy import signal
 from scipy.fftpack import dct
+import librosa
 
 
 class Feature(object):
     """ Base class for features calculation
-    This class is an interface and must not be instantiated. All children class must implement __str__ and __call__ function.
+    All children class must implement __str__ and _call function.
     """
 
-    def __init__(self):
-        raise NotImplementedError, "This class must not be instantiated"
+    def __init__(self, fs=8e3, eps=1e-14):
+        self.fs = fs
+        self.eps = eps
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def __call__(self):
+    def __call__(self, audio):
+        if isinstance(audio, str):
+            audio, current_fs = librosa.load(audio)
+            audio = librosa.core.resample(audio, current_fs, self.fs)
+            return self._call(audio)
+
+        if type(audio) in (np.ndarray, list) and len(a) > 1:
+            return self._call(audio)
+
+        raise TypeError, "audio type is not support"
+
+    def _call(self, data):
         raise NotImplementedError, "__call__ must be overrided"
+
+    def __str__(self):
+        raise NotImplementedError, "__str__ must be overrided"
 
 class FBank(Feature):
     """Compute Mel-filterbank energy features from an audio signal.
     """
 
-    def __init__(self, fs=16e3, win_len=0.025, win_step=0.01,
+    def __init__(self, win_len=0.025, win_step=0.01,
                  num_filt=40, nfft=512, low_freq=20, high_freq=7800,
-                 pre_emph=0.97, win_fun=signal.hamming, eps=1e-14):
+                 pre_emph=0.97, win_fun=signal.hamming, **kwargs):
         """Constructor
         """
 
-        if high_freq > fs/2:
+        super(FBank, self).__init__(**kwargs)
+
+        if high_freq > self.fs/2:
             raise ValueError, "high_freq must be less or equal than fs/2"
 
-        self.fs = fs
         self.win_len = win_len
         self.win_step = win_step
         self.num_filt = num_filt
@@ -47,11 +65,8 @@ class FBank(Feature):
         self.high_freq = high_freq or self.fs/2
         self.pre_emph = pre_emph
         self.win_fun = win_fun
-        self.eps = eps
 
         self._filterbanks = self._get_filterbanks()
-
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
 
     @property
@@ -77,7 +92,7 @@ class FBank(Feature):
         self._high_freq = value
 
 
-    def __call__(self, signal):
+    def _call(self, signal):
         """Compute Mel-filterbank energy features from an audio signal.
         :param signal: the audio signal from which to compute features. Should be an N*1 array
 
@@ -148,15 +163,16 @@ class FBank(Feature):
         """
         return 700*(10**(mel/2595.0)-1)
 
+    def __str__(self):
+        return "fbank"
+
 
 class MFCC(FBank):
     """Compute MFCC features from an audio signal.
     """
 
-    def __init__(self, fs=16e3, win_len=0.025, win_step=0.01, num_cep=13,
-                 num_filt=40, nfft=512, low_freq=20, high_freq=7800,
-                 pre_emph=0.97, cep_lifter=22, append_energy=True,
-                 win_fun=signal.hamming, d=True, dd=True, eps=1e-14):
+    def __init__(self, num_cep=13, cep_lifter=22, append_energy=True,
+                 d=True, dd=True, **kwargs):
         """ Constructor of class
 
             Args:
@@ -185,10 +201,7 @@ class MFCC(FBank):
                 dd: if True add delta-deltas coeficients. Default True
         """
 
-        super(MFCC, self).__init__(fs=fs, win_len=win_len, win_step=win_step,
-                                   num_filt=num_filt, nfft=nfft,
-                                   low_freq=low_freq, high_freq=high_freq,
-                                   pre_emph=pre_emph, win_fun=win_fun, eps=eps)
+        super(MFCC, self).__init__(**kwargs)
 
         self.num_cep = num_cep
         self.cep_lifter = cep_lifter
@@ -198,7 +211,7 @@ class MFCC(FBank):
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def __call__(self, signal):
+    def _call(self, signal):
         """Compute MFCC features from an audio signal.
 
         Args:
@@ -249,20 +262,18 @@ class MFCC(FBank):
             # values of L <= 0, do nothing
             return cepstra
 
+    def __str__(self):
+        return "mfcc"
+
 class LogFbank(FBank):
     """Compute Mel-filterbank energy features from an audio signal.
     """
 
-    def __init__(self, fs=16e3, win_len=0.025, win_step=0.01,
-                 num_filt=40, nfft=512, low_freq=20, high_freq=7800,
-                 pre_emph=0.97, win_fun=signal.hamming, append_energy=False, d=False, dd=False):
+    def __init__(self, append_energy=False, d=False, dd=False, **kwargs):
         """Constructor
         """
 
-        super(LogFbank, self).__init__(fs=fs, win_len=win_len, win_step=win_step,
-                                   num_filt=num_filt, nfft=nfft,
-                                   low_freq=low_freq, high_freq=high_freq,
-                                   pre_emph=pre_emph, win_fun=win_fun)
+        super(LogFbank, self).__init__(**kwargs)
 
         self.d = d
         self.dd = dd
@@ -270,7 +281,7 @@ class LogFbank(FBank):
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def __call__(self, signal):
+    def _call(self, signal):
         """Compute log Mel-filterbank energy features from an audio signal.
         :param signal: the audio signal from which to compute features. Should be an N*1 array
 
@@ -295,11 +306,17 @@ class LogFbank(FBank):
 
         return feat
 
-class Raw(Feature):
-    def __init__(self, *args, **kwargs):
-        pass
+    def __str__(self):
+        return "logfbank"
 
-    def __call__(self, signal):
+class Raw(Feature):
+    def __init__(self, **kwargs):
+        super(Raw, self).__init__(**kwargs)
+
+    def _call(self, signal):
         return signal
+
+    def __str__(self):
+        return "raw"
 
 raw = lambda x: Raw()(x)
