@@ -8,7 +8,7 @@ import numpy as np
 PUNCTUATIONS = "'""-,.!?:;"
 ACCENTS = 'ãõçâêôáéíóúà'
 
-class Parser(object):
+class CharParser(object):
     ''' Class responsible to map any text in a certain vocabulary
     '''
 
@@ -87,12 +87,6 @@ class Parser(object):
             for p in PUNCTUATIONS:
                 vocab[p] = len(vocab)
 
-        if 'a' in self.mode:
-            if 's' in self.mode:
-                accents = ACCENTS + ACCENTS.upper()
-            for a in ACCENTS:
-                vocab[a] = len(vocab)
-
         if 'd' in self.mode:
             for num in range(10):
                 vocab[str(num)]  = len(vocab)
@@ -104,5 +98,5 @@ class Parser(object):
 
         return vocab, inv_vocab
 
-simple_parser = lambda txt: Parser().map(txt)
-complex_parser = lambda txt: Parser(mode='b|p|a|d').map(txt)
+simple_char_parser = lambda txt: CharParser().map(txt)
+complex_char_parser = lambda txt: CharParser(mode='b|p|a|d').map(txt)
