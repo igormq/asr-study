@@ -30,7 +30,7 @@ def normalize_audio(input_list, mean, std):
     return [(i - mean)/std for i in input_list]
 
 
-def ldd2dl(ld):
+def ld2dl(ld):
     '''Transform a list of dictionaries in a dictionaries with lists
     NOTE: All dictionaries have the same keys
     '''
