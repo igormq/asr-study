@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import h5py
 import sys
+import os
 
 import numpy as np
 from scipy import sparse
