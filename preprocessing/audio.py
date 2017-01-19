@@ -7,6 +7,7 @@ from __future__ import print_function
 from common.sigproc import delta
 from common import sigproc
 
+import os
 import numpy as np
 import logging
 
@@ -20,18 +21,18 @@ class Feature(object):
     All children class must implement __str__ and _call function.
     """
 
-    def __init__(self, fs=8e3, eps=1e-14):
+    def __init__(self, fs=16e3, eps=1e-14):
         self.fs = fs
         self.eps = eps
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def __call__(self, audio):
-        if isinstance(audio, str):
-            audio, current_fs = librosa.load(audio)
+        if (isinstance(audio, str) or isinstance(audio, unicode)) and os.path.isfile(audio):
+            audio, current_fs = librosa.audio.load(audio)
             audio = librosa.core.resample(audio, current_fs, self.fs)
             return self._call(audio)
 
-        if type(audio) in (np.ndarray, list) and len(a) > 1:
+        if type(audio) in (np.ndarray, list) and len(audio) > 1:
             return self._call(audio)
 
         raise TypeError, "audio type is not support"
@@ -41,6 +42,10 @@ class Feature(object):
 
     def __str__(self):
         raise NotImplementedError, "__str__ must be overrided"
+
+    @property
+    def num_feats(self):
+        raise NotImplementedError, "num_feats must be overrided"
 
 class FBank(Feature):
     """Compute Mel-filterbank energy features from an audio signal.
@@ -167,6 +172,10 @@ class FBank(Feature):
         return "fbank"
 
 
+    def num_feats(self):
+        return self.num_filt
+
+
 class MFCC(FBank):
     """Compute MFCC features from an audio signal.
     """
@@ -222,7 +231,7 @@ class MFCC(FBank):
             A numpy array of size (NUMFRAMES by numcep) containing features.
             Each row holds 1 feature vector.
         """
-        feat, energy = super(MFCC, self).__call__(signal)
+        feat, energy = super(MFCC, self)._call(signal)
 
         feat = np.log(feat)
         feat = dct(feat, type=2, axis=1, norm='ortho')[:, :self.num_cep]
@@ -265,6 +274,10 @@ class MFCC(FBank):
     def __str__(self):
         return "mfcc"
 
+    @property
+    def num_feats(self):
+        return (1 + self.d + self.dd) * self.num_cep
+
 class LogFbank(FBank):
     """Compute Mel-filterbank energy features from an audio signal.
     """
@@ -289,7 +302,7 @@ class LogFbank(FBank):
              A numpy array of size (NUMFRAMES by nfilt) containing features. Each row holds 1 feature vector.
         """
 
-        feat, energy = super(LogFbank, self).__call__(signal)
+        feat, energy = super(LogFbank, self)._call(signal)
 
         feat = np.log(feat)
 
@@ -309,6 +322,10 @@ class LogFbank(FBank):
     def __str__(self):
         return "logfbank"
 
+    @property
+    def num_feats(self):
+        return (1 + self.d + self.dd) * (self.num_filt + self.append_energy)
+
 class Raw(Feature):
     def __init__(self, **kwargs):
         super(Raw, self).__init__(**kwargs)
@@ -319,4 +336,8 @@ class Raw(Feature):
     def __str__(self):
         return "raw"
 
-raw = lambda x: Raw()(x)
+    @property
+    def num_feats(self):
+        return None
+
+raw = Raw()
