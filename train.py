@@ -26,17 +26,6 @@ import uuid
 import os
 import json
 
-
-def from_json(path):
-
-    with codecs.open(path, 'r', encoding='utf8') as f:
-        data = json.load(f)
-
-    audio_paths = [d[0] for d in data]
-    texts = [d[1] for d in data]
-
-    return audio_paths, texts
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Training an ASR system.')
 
@@ -46,8 +35,10 @@ if __name__ == '__main__':
     parser.add_argument('--nb_epoch', default=100, type=int)
 
     parser.add_argument('--train', type=str)
-    parser.add_argument('--test', type=str)
+    parser.add_argument('--test', type=str, default=None)
     parser.add_argument('--valid', type=str, default=None)
+
+    parser.add_argument('--split', type=float, default=.2, help='Split valid/train ratio. Only enabled when valid=None')
 
     parser.add_argument('--lr', default=0.01, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
@@ -61,6 +52,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # Choosing gpu
     if args.gpu == '-1':
         config = tf.ConfigProto(device_count = {'GPU': 0})
     else:
@@ -71,14 +63,17 @@ if __name__ == '__main__':
     session = tf.Session(config=config)
     K.set_session(session)
 
+    # Creating the results folder
     name = args.save
     if not os.path.isdir(name):
         os.makedirs(name)
 
+    # Recovering all valid models
     valid_models = get_functions_from_module('core.models')
     if args.model not in valid_models.keys():
         raise ValueError('model %s not found. Valid models are: %s' % (args.model, ', '.join(valid_models.keys())))
 
+    # Load model
     model = valid_models[args.model](args.params)
 
     # Optimization
@@ -110,7 +105,8 @@ if __name__ == '__main__':
         X_train, y_train = X, y
         X_valid, y_valid = from_json(args.valid)
 
-    # #  Fit the model
+    # Fit the model
     model.fit_generator(data_gen.flow(X_train, y_train, batch_size=args.batch_size, seed=0), samples_per_epoch=len(X_train), nb_epoch=args.nb_epoch, validation_data=data_gen.flow(X_valid, y_valid, batch_size=args.batch_size, seed=0), nb_val_samples=len(X_valid), max_q_size=10, nb_worker=1, callbacks=callback_list, verbose=1)
 
-    metrics = model.evaluate_generator(data_gen.flow(X_test, y_test, batch_size=args.batch_size, seed=0), max_q_size=10, nb_worker=1)
+    if args.test:
+        metrics = model.evaluate_generator(data_gen.flow(X_test, y_test, batch_size=args.batch_size, seed=0), max_q_size=10, nb_worker=1)
