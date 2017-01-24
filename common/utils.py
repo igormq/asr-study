@@ -56,3 +56,9 @@ def get_custom_objects():
 def model_loader(treta_path):
     modelin = keras.models.load_model(treta_path, custom_objects=get_custom_objects())
     return modelin
+
+def ld2dl(ld):
+    '''Transform a list of dictionaries in a dictionaries with lists
+    NOTE: All dictionaries have the same keys
+    '''
+    return dict(zip(ld[0],zip(*[d.values() for d in ld])))
