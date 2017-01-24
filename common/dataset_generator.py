@@ -13,8 +13,8 @@ class DatasetGenerator(object):
     ''' Generates mini-batches from json file
     '''
 
-    def __init__(self, feature_extractor=audio.raw,
-                       text_parser=text.simple_char_parser, sr=16e3):
+    def __init__(self, feature_extractor=None,
+                       text_parser=None, sr=16e3):
         self.sr = sr
         self.feature_extractor = feature_extractor
         self.text_parser = text_parser
@@ -51,13 +51,44 @@ class DatasetIterator(Iterator):
         with self.lock:
             index_array, current_index, current_batch_size = next(self.index_generator)
 
-        max_labels_size = np.max([len(l) for l in self.labels[index_array]])
-        batch_labels = scipy.sparse.lil_matrix((current_batch_size, max_labels_size), dtype='int32')
-        for i, l in enumerate(self.labels[index_array]):
-             batch_labels[i, :l.size] = l
+        batch_inputs, batch_seq_len = self._make_in(self.inputs[index_array])
+        batch_labels = self._make_out(self.labels[index_array])
 
-        batch_inputs = pad_sequences(self.inputs[index_array], dtype='float32', padding='post')
-        batch_seq_len = np.asarray([i.shape[0] for i in self.inputs[index_array]])
+        return self._make_in_out(batch_inputs, batch_labels, seq_len=batch_seq_len)
 
-
+    def _make_in_out(self, batch_inputs, batch_labels, seq_len=None):
         return [batch_inputs, batch_labels, batch_seq_len], [np.zeros((batch_inputs.shape[0],)), batch_labels]
+
+    def _make_in(self, inputs):
+        if self.feature_extractor is not None:
+            inputs = np.asarray([self.feature_extractor(i) for i in inputs])
+
+        batch_inputs = pad_sequences(inputs, dtype='float32', padding='post')
+        batch_seq_len = np.asarray([i.shape[0] for i in inputs])
+        return batch_inputs, batch_seq_len
+
+    def _make_out(self, labels):
+        if self.text_parser is not None:
+            labels = np.asarray([self.text_parser(l) for l in labels])
+
+        max_labels_size = np.max([len(l) for l in labels])
+        batch_labels = scipy.sparse.lil_matrix((current_batch_size, max_labels_size), dtype='int32')
+        for i, l in enumerate(labels):
+             batch_labels[i, :l.size] = l
+        return batch_labels
+
+class H5Iterator(DatasetIterator):
+
+    def __init__(self, h5group, batch_size=32, shuffle=False, seed=None):
+
+        inputs = h5group['inputs']
+        labels = h5group['labels']
+
+        super(H5Iterator, self).__init__(inputs, labels, batch_size, shuffle, seed)
+
+        self.num_feats = inputs.attrs['num_feats']
+        self.durations = h5group['durations']
+
+    def _make_in(self, inputs):
+        inputs = [i.reshape(None, self.num_feats) for i in inputs]
+        return super(H5Iterator, self)._make_in(inputs)
