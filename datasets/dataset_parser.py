@@ -6,7 +6,7 @@ import h5py
 import numpy as np
 
 from datasets import DT_ABSPATH
-from datasets.utils import ld2dl
+from common.utils import ld2dl
 
 from preprocessing import audio
 from common.utils import safe_mkdirs
