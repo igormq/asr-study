@@ -29,6 +29,9 @@ class DatasetParser(object):
         if os.path.isfile(self.h5_fname):
                 self.has_h5 = True
 
+        if not os.path.isdir(self.output_dir):
+            safe_mkdirs(self.output_dir)
+
     @property
     def dt_dir(self):
         """Filepath to the dataset directory"""
@@ -115,7 +118,7 @@ class DatasetParser(object):
                 get_groups = lambda x: [feat_group['%s/%s' % (x['dt'], dt)] for dt in ('inputs', 'labels', 'durations')]
             else:
                 get_groups = lambda x: [feat_group['%s' % (dt)] for dt in ('inputs', 'labels', 'durations')]
-                create_datasets(feat_group['/'])
+                create_datasets(feat_group)
 
             for index, data in enumerate(ld):
 
