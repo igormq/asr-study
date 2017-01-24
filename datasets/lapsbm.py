@@ -9,6 +9,24 @@ class LapsBM(DatasetParser):
 
     version = '1.4'
 
+    # Random separation of LAPSBM1.4 dataset in validation and test if required
+
+    # 5 women, 10 men
+    _test_speaker_id = [3, 11, 13, 17, 12, 33,  5, 22, 16,  8,  4,  0, 20, 10,  9]
+
+    # 5 women, 15 men
+    _valid_speaker_id = [29, 32, 14, 31, 25, 23, 19, 26,  6,  2, 24, 15,  1, 21, 28, 30, 34, 27, 18, 7]
+
+    def __init__(self, dt_dir=None, split=False, name=None):
+
+        self._name = name or 'lapsbm'
+        self._split = split
+
+        if not name and split:
+            self._name += '_split'
+
+        super(LapsBM, self).__init__(dt_dir)
+
     def _iter(self):
         for speaker_path in os.listdir(self.dt_dir):
 
@@ -34,20 +52,30 @@ class LapsBM(DatasetParser):
                     print('File %s not found' % audio_file)
                     continue
 
-                yield {'duration': duration,
-                       'audio': audio_file,
-                       'label': label,
-                       'gender': gender,
-                       'speaker': speaker_id}
+                dt_name = 'valid'
+
+                if int(speaker_id) in self._test_speaker_id:
+                    dt_name = 'test'
+
+                data =  {'duration': duration,
+                        'audio': audio_file,
+                        'label': label,
+                        'gender': gender,
+                        'speaker': speaker_id}
+
+                if self._split:
+                    data['dt'] = dt_name
+
+                yield data
 
     def _report(self, dl):
         report = '''General information:
            Number of utterances: %d
            Total size (in seconds) of utterances: %.f
            Number of speakers: %d'
-           %% of female speaker: %.2f%%''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])), 100*(sum([1 for g in genders if g == 'f']) / (1.0*len(dl['gender']))))
+           %% of female speaker: %.2f%%''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])), 100*(sum([1 for g in dl['gender'] if g == 'f']) / (1.0*len(dl['gender']))))
 
         return report
 
     def __str__(self):
-        return 'lapsbm'
+        return self._name
