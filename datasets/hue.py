@@ -22,19 +22,26 @@ class HUE(DatasetParser):
         return self._dt_dir
 
     def _iter(self):
-        dts = {'cslu': 'train', 'voxforge': 'train', 'sidney': 'train', 'lapsbm': 'test'}
 
         for dataset in (CSLU(self.dt_dir['cslu']),
                         VoxForge(self.dt_dir['voxforge']),
-                        Sidney(self.dt_dir['sidney']),
-                        LapsBM(self.dt_dir['lapsbm'])):
-                        
+                        Sidney(self.dt_dir['sidney'])):
+
             for d in dataset._iter():
                 yield {'duration': d['duration'],
                        'audio': d['audio'],
                        'label': d['label'],
                        'speaker': '%s_%s' % (str(dataset), d['speaker']),
-                       'dt': dts[str(dataset)]}
+                       'dt': 'train'}
+
+        # Test and valid set
+        lapsbm = LapsBM(self.dt_dir['lapsbm'], split=True)
+        for d in lapsbm._iter():
+            yield {'duration': d['duration'],
+                   'audio': d['audio'],
+                   'label': d['label'],
+                   'speaker': '%s_%s' % (str(dataset), d['speaker']),
+                   'dt': d['dt']}
 
     def _report(self, dl):
         report = '''General information:
