@@ -54,9 +54,9 @@ class LapsBM(DatasetParser):
 
                 if len(label) == 0:
                     print('File %s has label with length 0. Skipping' % audio_file)
+                    continue
 
                 dt_name = 'valid'
-
                 if int(speaker_id) in self._test_speaker_id:
                     dt_name = 'test'
 

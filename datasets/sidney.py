@@ -53,6 +53,7 @@ class Sidney(DatasetParser):
 
                 if len(label) == 0:
                     print('File %s has label with length 0. Skipping' % audio_file)
+                    continue
 
                 yield {'duration': duration,
                        'audio': audio_file,
