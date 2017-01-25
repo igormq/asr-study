@@ -120,25 +120,25 @@ if __name__ == '__main__':
     text_parser = valid_text_parsers[args.text_parser]
 
     # Data generator
-    data_gen = DatasetGenerator(feature_extractor, text_parser)
+    data_gen = DatasetGenerator(feats_extractor, text_parser)
 
     train_flow, valid_flow, test_flow = None, None, None
 
     if args.dataset is not None:
-        train_flow, valid_flow, test_flow = DatasetGenerator.flows_from_fname(args.dataset, batch_size=args.batch_size, seed=0)
+        train_flow, valid_flow, test_flow = data_gen.flows_from_fname(args.dataset, batch_size=args.batch_size, seed=0)
     else:
         if args.train:
-            train_flow = DatasetGenerator.flow_from_fname(args.train, dt_name='train', batch_size=args.batch_size, seed=0)
+            train_flow = data_gen.flow_from_fname(args.train, dt_name='train', batch_size=args.batch_size, seed=0)
 
         if args.valid:
-            valid_flow = DatasetGenerator.flow_from_fname(args.valid, dt_name='valid', batch_size=args.batch_size, seed=0)
+            valid_flow = data_gen.flow_from_fname(args.valid, dt_name='valid', batch_size=args.batch_size, seed=0)
 
         if args.test:
-             test_flow = DatasetGenerator.flow_from_fname(args.test, dt_name='test', batch_size=args.batch_size)
+             test_flow = data_gen.flow_from_fname(args.test, dt_name='test', batch_size=args.batch_size)
 
     nb_val_samples = None
     if valid_flow:
-        nb_val_samples.len
+        nb_val_samples = valid_flow.len
 
     # Fit the model
     model.fit_generator(train_flow, samples_per_epoch=train_flow.len, nb_epoch=args.nb_epoch, validation_data=valid_flow, nb_val_samples=nb_val_samples, max_q_size=10, nb_worker=1, callbacks=callback_list, verbose=1)
