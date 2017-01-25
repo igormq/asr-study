@@ -20,6 +20,7 @@ from preprocessing import audio, text
 
 from common.utils import get_functions_from_module
 from common.dataset_generator import DatasetGenerator
+from common.hparams import HParams
 
 import argparse
 import uuid
@@ -34,6 +35,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--nb_epoch', default=100, type=int)
 
+    parser.add_argument('--dataset', default=None, type=str, help="Path to dataset h5 or json file separated by train/valid/test")
+
     parser.add_argument('--train', type=str)
     parser.add_argument('--test', type=str, default=None)
     parser.add_argument('--valid', type=str, default=None)
@@ -45,6 +48,11 @@ if __name__ == '__main__':
     parser.add_argument('--clipnorm', default=5, type=float)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--opt', default='sgd', type=str, choices=['sgd', 'adam'])
+
+    parser.add_argument('--feats', type=str, default='raw', choices=['mfcc', 'raw', 'logfbank'])
+    parser.add_argument('--feats_params', type=str, default='{}')
+
+    parser.add_argument('--text_parser', type=str, default='simple_char_parser')
 
     parser.add_argument('--save', default=os.path.join('results', str(uuid.uuid1())), type=str)
 
@@ -94,19 +102,46 @@ if __name__ == '__main__':
     best_ckpt = ModelCheckpoint(os.path.join(name, 'best.h5'), monitor='val_decoder_ler', save_best_only=True, mode='min')
     callback_list = [meta_ckpt, model_ckpt, best_ckpt]
 
-    # Data generator
-    data_gen = DatasetGenerator(lambda x: audio.MFCC(d=True)(x), text.simple_parser)
-
-    X, y = from_json(args.train)
-
-    if args.valid is None:
-        X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.15, random_state=42)
+    # Features extractor
+    feats_params = HParams()
+    feats_params.parse(args.feats_params)
+    if args.feats == 'mfcc':
+        feats_extractor = audio.MFCC(*feats_params.keyvals)
+    elif args.feats == 'logfbank':
+        feats_extractor = audio.LogFBank(*feats_params.keyvals)
     else:
-        X_train, y_train = X, y
-        X_valid, y_valid = from_json(args.valid)
+        feats_extractor = None
+
+    # Recovering text parser
+    valid_text_parsers = get_functions_from_module('preprocessing.text')
+    if not valid_text_parsers.has_key(args.text_parser):
+        raise ValueError('text_parser %s not found. Valid text_parser are: %s' % (args.text_parser, ', '.join(valid_text_parsers.keys())))
+
+    text_parser = valid_text_parsers[args.text_parser]
+
+    # Data generator
+    data_gen = DatasetGenerator(feature_extractor, text_parser)
+
+    train_flow, valid_flow, test_flow = None, None, None
+
+    if args.dataset is not None:
+        train_flow, valid_flow, test_flow = DatasetGenerator.flows_from_fname(args.dataset, batch_size=args.batch_size, seed=0)
+    else:
+        if args.train:
+            train_flow = DatasetGenerator.flow_from_fname(args.train, dt_name='train', batch_size=args.batch_size, seed=0)
+
+        if args.valid:
+            valid_flow = DatasetGenerator.flow_from_fname(args.valid, dt_name='valid', batch_size=args.batch_size, seed=0)
+
+        if args.test:
+             test_flow = DatasetGenerator.flow_from_fname(args.test, dt_name='test', batch_size=args.batch_size)
+
+    nb_val_samples = None
+    if valid_flow:
+        nb_val_samples.len
 
     # Fit the model
-    model.fit_generator(data_gen.flow(X_train, y_train, batch_size=args.batch_size, seed=0), samples_per_epoch=len(X_train), nb_epoch=args.nb_epoch, validation_data=data_gen.flow(X_valid, y_valid, batch_size=args.batch_size, seed=0), nb_val_samples=len(X_valid), max_q_size=10, nb_worker=1, callbacks=callback_list, verbose=1)
+    model.fit_generator(train_flow, samples_per_epoch=train_flow.len, nb_epoch=args.nb_epoch, validation_data=valid_flow, nb_val_samples=nb_val_samples, max_q_size=10, nb_worker=1, callbacks=callback_list, verbose=1)
 
-    if args.test:
-        metrics = model.evaluate_generator(data_gen.flow(X_test, y_test, batch_size=args.batch_size, seed=0), max_q_size=10, nb_worker=1)
+    if test_flow:
+        metrics = model.evaluate_generator(test_flow, max_q_size=10, nb_worker=1)
