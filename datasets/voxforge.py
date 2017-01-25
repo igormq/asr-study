@@ -65,6 +65,9 @@ class VoxForge(DatasetParser):
                     print('File %s not found' % audio_file)
                     continue
 
+                if len(label) == 0:
+                    print('File %s has label with length 0. Skipping' % audio_file)
+
                 yield {'duration': duration,
                        'audio': audio_file,
                        'label': label,

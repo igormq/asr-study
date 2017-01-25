@@ -33,7 +33,7 @@ class HUE(DatasetParser):
                        'label': d['label'],
                        'speaker': '%s_%s' % (str(dataset), d['speaker']),
                        'dt': 'train'}
-
+       
         # Test and valid set
         lapsbm = LapsBM(self.dt_dir['lapsbm'], split=True)
         for d in lapsbm._iter():
