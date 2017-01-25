@@ -191,13 +191,14 @@ class H5Iterator(DatasetIterator):
         if text_parser is None:
             raise ValueError, "text_parser must be set"
 
-        super(H5Iterator, self).__init__(inputs, labels, batch_size, shuffle, seed, feature_extractor, text_parser)
-
         self.num_feats = None
         if 'num_feats' in inputs.attrs.keys():
             self.num_feats = inputs.attrs['num_feats']
+            feature_extractor = None
 
         self.durations = h5group['durations']
+
+        super(H5Iterator, self).__init__(inputs, labels, batch_size, shuffle, seed, feature_extractor, text_parser)
 
     def _make_in(self, inputs, batch_size=None):
         if self.num_feats is not None:
