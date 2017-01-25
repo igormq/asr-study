@@ -141,7 +141,7 @@ class DatasetIterator(Iterator):
         super(DatasetIterator, self).__init__(len(inputs), batch_size, shuffle, seed)
 
     @property
-    def len:
+    def len(self):
         return len(self.inputs)
 
 
