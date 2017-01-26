@@ -34,6 +34,7 @@ class DatasetGenerator(object):
             feat_group = h5_f['raw']
             if self.feature_extractor is not None and str(self.feature_extractor) in h5_f.keys():
                 feat_group = h5_f[str(self.feature_extractor)]
+                self.feature_extractor = None
 
             if dt_name and dt_name in feat_group.keys():
                 dt_iter = self.flow_from_h5(feat_group[dt_name], batch_size, shuffle, seed)
@@ -69,6 +70,7 @@ class DatasetGenerator(object):
             feat_group = h5_f['raw']
             if self.feature_extractor is not None and str(self.feature_extractor) in h5_f.keys():
                 feat_group = h5_f[str(self.feature_extractor)]
+                self.feature_extractor = None # it's not necessary, feature already exists
 
             if 'train' in feat_group.keys():
                 train_iter = self.flow_from_h5(feat_group['train'], batch_size, shuffle, seed)
@@ -194,6 +196,8 @@ class H5Iterator(DatasetIterator):
         self.num_feats = None
         if 'num_feats' in inputs.attrs.keys():
             self.num_feats = inputs.attrs['num_feats']
+
+            # Features are computed, no necessity of extract them
             feature_extractor = None
 
         self.durations = h5group['durations']
