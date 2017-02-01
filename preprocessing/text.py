@@ -6,7 +6,7 @@ from unidecode import unidecode
 import numpy as np
 
 PUNCTUATIONS = "'""-,.!?:;"
-ACCENTS = 'ãõçâêôáéíóúà'
+ACCENTS = u'ãõçâêôáíóúàüóé'
 
 class CharParser(object):
     ''' Class responsible to map any text in a certain vocabulary
@@ -40,8 +40,11 @@ class CharParser(object):
 
         self._vocab, self._inv_vocab = self._gen_vocab()
 
-    def map(self, txt):
-        label = np.array([self._vocab[c] for c in self._sanitize(txt)], dtype='int32')
+    def map(self, txt, sanitize=True):
+        if sanitize:
+            label = np.array([self._vocab[c] for c in self._sanitize(txt)], dtype='int32')
+        else:
+            label = np.array([self._vocab[c] for c in txt], dtype='int32')
 
         return label
 
@@ -71,9 +74,21 @@ class CharParser(object):
 
         return text
 
+    def is_valid(self, text, ignore_accents=True):
+        # verify if the text is valid without sanitization
+        try:
+            _ = self.map(text, sanitize=False)
+            return True
+        except KeyError:
+            return False
+
     def _gen_vocab(self):
 
         vocab = {chr(value + ord('a')): (value) for value in xrange(ord('z') - ord('a') + 1)}
+
+        if 'a' in self.mode:
+            for a in ACCENTS:
+                vocab[a] = len(vocab)
 
         if 's' in self.mode:
             for char in vocab.keys():
