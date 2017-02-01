@@ -54,7 +54,7 @@ def graves2006(hparams=None):
     return ctc_model(x, o)
 
 def bayesian_lstm(hparams):
-    """ LSTM with variational dropout and weight decay. Following the best toplogy of [2] (without a transducer).
+    """ LSTM with variational dropout and weight decay. Following the best topology of [2] (without a transducer).
     Note:
         Dropout is tied through layers, and weights and the same for weight decay, minimizing the number of hyper parameters
     Reference:
