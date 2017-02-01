@@ -8,18 +8,19 @@ import numpy as np
 from datasets import DT_ABSPATH
 from common.utils import ld2dl
 
-from preprocessing import audio
+from preprocessing import audio, text
 from common.utils import safe_mkdirs
 
 class DatasetParser(object):
     '''Read data from directory and parse_args
     '''
 
-    def __init__(self, dt_dir=None):
+    def __init__(self, dt_dir=None, text_parser=text.CharParser('s|b|a|p')):
         self.dt_dir = dt_dir
         self.output_dir = os.path.join(DT_ABSPATH, self.name)
         self.json_fname = os.path.join(self.output_dir, 'data.json')
         self.h5_fname = os.path.join(self.output_dir, 'data.h5')
+        self.text_parser = text_parser
 
         self.has_json = False
         if os.path.isfile(self.json_fname):
@@ -186,6 +187,15 @@ class DatasetParser(object):
 
     def _report(self, dl):
         raise NotImplementedError, "_report must be implemented"
+
+    def _is_valid_label(self, label):
+        if len(label) == 0:
+            return False
+
+        if self.text_parser is None:
+            return True
+
+        return self.text_parser.is_valid(label)
 
     @property
     def name(self):
