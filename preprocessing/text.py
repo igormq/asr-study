@@ -8,21 +8,36 @@ import numpy as np
 PUNCTUATIONS = "'""-,.!?:;"
 ACCENTS = u'ãõçâêôáíóúàüóé'
 
-class CharParser(object):
-    ''' Class responsible to map any text in a certain vocabulary
-    '''
+class BaseParser(object):
+    """ Interface class for all parsers
+    """
+
+    def __init__(self):
+        pass
+
+    def map(self, _input):
+        pass
+
+    def imap(self, _input):
+        pass
+
+    def is_valid(self, _input):
+        pass
+
+class CharParser(BaseParser):
+    """ Class responsible to map any text in a certain character vocabulary
+
+    # Arguments
+        mode: Which type of vacabulary will be generated. Modes can be concatenated by using pipeline '|'
+            'blank' or 'b': accepts space character
+            'accents' or 'a': accepts pt-br accents
+            'punctuation' or 'p': accepts punctuation defined in string.punctuation
+            'digits': accepts all digits
+            'sensitive' or 's': characters will be case sensitive
+            'all': shortcut that enables all modes
+    """
 
     def __init__(self, mode='blank'):
-        ''' Constructor of the class
-        Arguments:
-            mode: Which type of vacabulary will be generated. Modes can be concatenated by using pipeline '|'
-                'blank' or 'b': accepts space character
-                'accents' or 'a': accepts pt-br accents
-                'punctuation' or 'p': accepts punctuation defined in string.punctuation
-                'digits': accepts all digits
-                'sensitive' or 's': characters will be case sensitive
-                'all': shortcut that enables all modes
-        '''
         self._permitted_modes = {'sensitive': 's', 'blank': 'b', 'accents': 'a', 'punctuation': 'p', 'digits': 'd'}
 
         if mode == 'all':

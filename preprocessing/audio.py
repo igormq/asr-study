@@ -19,6 +19,10 @@ import librosa
 class Feature(object):
     """ Base class for features calculation
     All children class must implement __str__ and _call function.
+
+    # Arguments
+        fs: sampling frequency of audio signal. If the audio has not this fs, it will be resampled
+        eps
     """
 
     def __init__(self, fs=16e3, eps=1e-14):
@@ -27,6 +31,17 @@ class Feature(object):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def __call__(self, audio):
+        """ This method load the audio and do the transformation of signal
+
+        # Inputs
+            audio:
+                if audio is a string and the file exists, the wave file will be loaded and resampled (if necessary) to fs
+                if audio is a ndarray or list and is not empty, it will make the transformation without any resampling
+
+        # Exception
+            TypeError if audio were not recognized
+
+        """
         if (isinstance(audio, str) or isinstance(audio, unicode)) and os.path.isfile(audio):
             audio, current_fs = librosa.audio.load(audio)
             audio = librosa.core.resample(audio, current_fs, self.fs)
@@ -49,13 +64,27 @@ class Feature(object):
 
 class FBank(Feature):
     """Compute Mel-filterbank energy features from an audio signal.
+
+    # Arguments
+        win_len: the length of the analysis window in seconds.
+            Default  is 0.025s (25 milliseconds)
+        win_step: the step between successive windows in seconds.
+            Default is 0.01s (10 milliseconds)
+        num_filt: the number of filters in the filterbank, default 40.
+        nfft: the FFT size. Default is 512.
+        low_freq: lowest band edge of mel filters in Hz.
+            Default is 20.
+        high_freq: highest band edge of mel filters in Hz.
+            Default is 7800
+        pre_emph: apply preemphasis filter with preemph as coefficient.
+        0 is no filter. Default is 0.97.
+        win_func: the analysis window to apply to each frame.
+            By default hamming window is applied.
     """
 
     def __init__(self, win_len=0.025, win_step=0.01,
                  num_filt=40, nfft=512, low_freq=20, high_freq=7800,
                  pre_emph=0.97, win_fun=signal.hamming, **kwargs):
-        """Constructor
-        """
 
         super(FBank, self).__init__(**kwargs)
 
@@ -178,37 +207,19 @@ class FBank(Feature):
 
 class MFCC(FBank):
     """Compute MFCC features from an audio signal.
+
+    # Arguments
+        num_cep: the number of cepstrum to return. Default 13.
+        cep_lifter: apply a lifter to final cepstral coefficients. 0 is
+        no lifter. Default is 22.
+        append_energy: if this is true, the zeroth cepstral coefficient
+        is replaced with the log of the total frame energy.
+        d: if True add deltas coeficients. Default True
+        dd: if True add delta-deltas coeficients. Default True
     """
 
     def __init__(self, num_cep=13, cep_lifter=22, append_energy=True,
                  d=True, dd=True, **kwargs):
-        """ Constructor of class
-
-            Args:
-                fs: the samplerate of the signal we are working with.
-                    Default is 8e3
-                win_len: the length of the analysis window in seconds.
-                    Default  is 0.025s (25 milliseconds)
-                win_step: the step between successive windows in seconds.
-                    Default is 0.01s (10 milliseconds)
-                num_cep: the number of cepstrum to return. Default 13.
-                num_filt: the number of filters in the filterbank, default 40.
-                nfft: the FFT size. Default is 512.
-                low_freq: lowest band edge of mel filters in Hz.
-                    Default is 20.
-                high_freq: highest band edge of mel filters in Hz.
-                    Default is 7800
-                pre_emph: apply preemphasis filter with preemph as coefficient.
-                0 is no filter. Default is 0.97.
-                cep_lifter: apply a lifter to final cepstral coefficients. 0 is
-                no lifter. Default is 22.
-                append_energy: if this is true, the zeroth cepstral coefficient
-                is replaced with the log of the total frame energy.
-                win_func: the analysis window to apply to each frame.
-                    By default hamming window is applied.
-                d: if True add deltas coeficients. Default True
-                dd: if True add delta-deltas coeficients. Default True
-        """
 
         super(MFCC, self).__init__(**kwargs)
 
@@ -280,6 +291,11 @@ class MFCC(FBank):
 
 class LogFbank(FBank):
     """Compute Mel-filterbank energy features from an audio signal.
+
+    # Arguments
+        append_energy: if this is true, log of the total frame energy is append to the features vector. Default False
+        d: if True add deltas coeficients. Default False
+        dd: if True add delta-deltas coeficients. Default False
     """
 
     def __init__(self, append_energy=False, d=False, dd=False, **kwargs):
@@ -327,6 +343,8 @@ class LogFbank(FBank):
         return (1 + self.d + self.dd) * (self.num_filt + self.append_energy)
 
 class Raw(Feature):
+    """ Raw features extractor
+    """
     def __init__(self, **kwargs):
         super(Raw, self).__init__(**kwargs)
 

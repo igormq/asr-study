@@ -11,9 +11,12 @@ from keras.models import Model
 from keras.layers import Input, GaussianNoise, TimeDistributed, Dense, LSTM, Masking, Bidirectional, Lambda, Dropout
 from keras.regularizers import l1, l2, l1l2
 
-def ctc_model(input_, output):
-    ''' Given the output returns a model appending ctc_loss and the decoder
-    '''
+def ctc_model(input_, output, **kwargs):
+    """ Given the input and output returns a model appending ctc_loss and the decoder
+
+    # Arguments
+        see core.ctc_utils.layer_utils.decode for more arguments
+    """
 
     # Define placeholders
     labels = Input(name='labels', shape=(None,), dtype='int32', sparse=True)

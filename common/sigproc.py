@@ -1,5 +1,7 @@
-# This file includes routines for basic signal processing including framing and computing power spectra.
-# Author: James Lyons 2012
+""" Code based on package python_speech_features
+
+Author: James Lyons 2012
+"""
 import decimal
 
 import numpy
@@ -8,7 +10,6 @@ import math
 
 def round_half_up(number):
     return int(decimal.Decimal(number).quantize(decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP))
-
 
 def framesig(sig, frame_len, frame_step, winfunc=lambda x:numpy.ones((x,))):
     """Frame a signal into overlapping frames.
