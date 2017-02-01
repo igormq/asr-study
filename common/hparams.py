@@ -5,15 +5,19 @@ class HParams(object):
   Use the parse method to overwrite the default hyperparameters with values
   passed in as a string representation of a Python dictionary mapping
   hyperparameters to values.
-  Ex.
-  hparams = magenta.common.HParams(batch_size=128, hidden_size=256)
-  hparams.parse('{"hidden_size":512}')
-  assert hparams.batch_size == 128
-  assert hparams.hidden_size == 512
+
+  # Example
+      hparams = magenta.common.HParams(batch_size=128, hidden_size=256)
+      hparams.parse('{"hidden_size":512}')
+      assert hparams.batch_size == 128
+      assert hparams.hidden_size == 512
   """
 
-  def __init__(self, **init_hparams):
+  def __init__(self, from_str=None, **init_hparams):
     object.__setattr__(self, 'keyvals', init_hparams)
+
+    if from_str:
+        self.parse(from_str)
 
   def __getattr__(self, key):
     """Returns value of the given hyperameter, or None if does not exist."""
@@ -30,6 +34,8 @@ class HParams(object):
   def parse(self, values_string):
     """Merges in new hyperparameters, replacing existing with same key."""
     self.update(ast.literal_eval(values_string))
+
+    return self
 
   def values(self):
     """Return the hyperparameter values as a Python dictionary."""
