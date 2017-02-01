@@ -58,7 +58,7 @@ class DatasetGenerator(object):
 
         raise ValueError, "Extension not recognized"
 
-    def flows_from_fname(self, fname, batch_size=32, shuffle=True, seed=None, split=[1., 0., 0.]):
+    def flows_from_fname(self, fname, batch_size=32, shuffle=True, seed=None):
         ext = os.path.splitext(fname)[1]
 
         train_iter, valid_iter, test_iter = None, None, None
@@ -156,6 +156,7 @@ class DatasetIterator(Iterator):
         index_array.sort()
 
         batch_inputs, batch_seq_len = self._make_in(self.inputs[index_array.tolist()], current_batch_size)
+
         batch_labels = self._make_out(self.labels[index_array.tolist()], current_batch_size)
 
         return self._make_in_out(batch_inputs, batch_labels, batch_seq_len)
@@ -175,11 +176,14 @@ class DatasetIterator(Iterator):
         if self.text_parser is not None:
             labels = [self.text_parser(l) for l in labels]
 
-        max_labels_size = np.max([len(l) for l in labels])
-        batch_labels = scipy.sparse.lil_matrix((batch_size, max_labels_size), dtype='int32')
-        for i, l in enumerate(labels):
-             batch_labels[i, :l.size] = l
-        return batch_labels
+        rows, cols, data = [], [], []
+
+        for row, label in enumerate(labels):
+            cols.extend(range(len(label)))
+            rows.extend(len(label) * [row])
+            data.extend(label)
+
+        return scipy.sparse.coo_matrix((data, (rows, cols)), dtype='int32')
 
 class H5Iterator(DatasetIterator):
 
