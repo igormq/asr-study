@@ -9,15 +9,27 @@ import tempfile
 import numpy as np
 
 class Dummy(DatasetParser):
+    """ Fake dataset reader and parser to do some tests
 
-    def __init__(self, nb_speakers=10, nb_utterances_per_speaker=10, max_duration=10.0, min_duration=1.0, max_label_length=200, fs=16e3, name='dummy', split=None):
+    # Arguments
+        nb_speakers: number of speakers
+        nb_utterances_per_speaker: number of utterances that each speaker will have
+        max_duration: max duration in seconds of each fake audio
+        min_duration: min duration in seconds of each fake audio
+        max_label_length: max size of each fake label
+        fs: sampling frequency of each fake audio
+        split: list with two values. It will divide this dataset in three sets (train, valid and test) given the proportions
+    """
+
+    def __init__(self, nb_speakers=10, nb_utterances_per_speaker=10, max_duration=10.0, min_duration=1.0, max_label_length=200, fs=16e3, split=None, **kwargs):
         '''
         Args:
             split: list or nparray of size 2 that splits the data between train, valid and test. example: split = [.8 .15] = 80% train, 15% valid and 5% test
         '''
-        self._name = name
 
-        super(Dummy, self).__init__(None)
+        kwargs.setdefault('name', 'dummy')
+
+        super(Dummy, self).__init__(**kwargs)
 
         self.nb_speakers = nb_speakers
         self.nb_utterances_per_speaker = nb_utterances_per_speaker
@@ -77,6 +89,3 @@ class Dummy(DatasetParser):
                 Number of speakers: %d''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])))
 
         return report
-
-    def __str__(self):
-        return self._name

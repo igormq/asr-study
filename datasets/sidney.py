@@ -8,6 +8,13 @@ import codecs
 import numpy as np
 
 class Sidney(DatasetParser):
+    """ Sidney dataset reader and parser
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('name', 'sidney')
+
+        super(Sidney, self).__init__(**kwargs)
 
     def _iter(self):
         for speaker_path in os.listdir(self.dt_dir):
@@ -73,11 +80,9 @@ class Sidney(DatasetParser):
 
         return report
 
-    def __str__(self):
-        return 'sidney'
-
-
 if __name__ == '__main__':
+    """ Script to fix some errors in sidney dataset about the name convention on folder and some errors in transcription
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('data_directory', type=str,
                         help='Path to data directory')

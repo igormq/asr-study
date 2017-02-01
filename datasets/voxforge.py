@@ -7,14 +7,20 @@ import codecs
 
 
 class VoxForge(DatasetParser):
+    """ VoxForge (only portuguese brazilian audio files) dataset reader and parser
+
+    More about the dataset: http://www.voxforge.org/
+    """
 
     IGNORED_LIST = ['Marcelo-20131106-iqc', 'anonymous-20140619-wcy', 'ThiagoCastro-20131129-qpn', 'anonymous-20131016-uzv']
 
-    def __init__(self, dt_dir):
+    def __init__(self, **kwargs):
 
-        super(VoxForge, self).__init__(dt_dir)
+        kwargs.setdefault('name', 'voxforge')
 
-        if os.path.isdir(os.path.join(self.dt_dir, 'files')):
+        super(VoxForge, self).__init__(**kwargs)
+
+        if self.dt_dir is not None and os.path.isdir(os.path.join(self.dt_dir, 'files')):
             self.dt_dir = os.path.join(self.dt_dir, 'files')
 
     def _iter(self):
@@ -84,6 +90,3 @@ class VoxForge(DatasetParser):
                 Anonymous speaker: %.2f%%''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])), 100*(sum([1 for g in dl['gender'] if g == 'f']) / (1.0*len(dl['gender']))), 100*(sum([1 for s in dl['speaker'] if s == 'anonymous']) / (1.0*len(dl['speaker']))))
 
         return report
-
-    def __str__(self):
-        return 'voxforge'

@@ -12,15 +12,16 @@ from preprocessing import audio, text
 from common.utils import safe_mkdirs
 
 class DatasetParser(object):
-    '''Read data from directory and parse_args
+    '''Read data from directory and parser in a proper format
     '''
 
-    def __init__(self, dt_dir=None, text_parser=text.CharParser('s|b|a|p')):
+    def __init__(self, dt_dir=None, name=None, text_parser=text.CharParser('s|b|a|p')):
         self.dt_dir = dt_dir
         self.output_dir = os.path.join(DT_ABSPATH, self.name)
         self.json_fname = os.path.join(self.output_dir, 'data.json')
         self.h5_fname = os.path.join(self.output_dir, 'data.h5')
         self.text_parser = text_parser
+        self._name = name
 
         self.has_json = False
         if os.path.isfile(self.json_fname):
@@ -199,7 +200,7 @@ class DatasetParser(object):
 
     @property
     def name(self):
-        return str(self)
+        return self._name
 
     def __str__(self):
-        raise NotImplementedError, "__str__ must be implemented"
+        return self.name

@@ -6,6 +6,16 @@ import librosa
 import codecs
 
 class CSLUSpoltechPort(DatasetParser):
+    """ CSLU Spoltech Port dataset reader and parser
+
+    More about the dataset: https://catalog.ldc.upenn.edu/LDC2006S16
+    """
+
+    def __init__(self, **kwargs):
+
+        kwargs.setdefault('name', 'cslu')
+
+        super(CSLUSpoltechPort, self).__init__(**kwargs)
 
     def _iter(self):
         trans_directory = os.path.join(self.dt_dir, 'trans')
@@ -49,6 +59,3 @@ class CSLUSpoltechPort(DatasetParser):
            Number of speakers: %d''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])))
 
         return report
-
-    def __str__(self):
-        return 'cslu'

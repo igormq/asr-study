@@ -7,6 +7,22 @@ import librosa
 import codecs
 
 class HUE(DatasetParser):
+    """ HUE dataset reader and parser
+
+    This dataset is a combination of four smaller datasets (voxforge, lapsbm, sidney, and cslu spoltech port). The dataset was divided in the following way:
+        * Train: voxforge, sidney, and cslu spoltech port
+        * Valid: 5 women and 15 men from LaspBM
+        * Test: 5 women 10 men from LapsBM (without overlapping with valid set either in speaker and utterance spoken)
+
+    After cleaning (removing label with zero length, label with numeric digits, e.g., 4 instead of four) the training set contains 11702 utterances with 425 speakers.
+
+    """
+
+    def __init__(self, **kwargs):
+
+        kwargs.setdefault('name', 'hue')
+
+        super(HUE, self).__init__(**kwargs)
 
     def dt_dir(self):
         """Filepath to the dataset directory"""
@@ -33,7 +49,7 @@ class HUE(DatasetParser):
                        'label': d['label'],
                        'speaker': '%s_%s' % (str(dataset), d['speaker']),
                        'dt': 'train'}
-       
+
         # Test and valid set
         lapsbm = LapsBM(self.dt_dir['lapsbm'], split=True)
         for d in lapsbm._iter():
@@ -50,6 +66,3 @@ class HUE(DatasetParser):
            Number of speakers: %d''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])))
 
         return report
-
-    def __str__(self):
-        return 'hue'
