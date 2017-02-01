@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 import keras
 import keras.backend as K
 from keras.optimizers import SGD, Adam
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
 from core import metrics
 from core.ctc_utils import ctc_dummy_loss, decoder_dummy_loss
@@ -26,6 +26,7 @@ import argparse
 import uuid
 import os
 import json
+import datetime
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Training an ASR system.')
@@ -44,6 +45,10 @@ if __name__ == '__main__':
     parser.add_argument('--split', type=float, default=.2, help='Split valid/train ratio. Only enabled when valid=None')
 
     parser.add_argument('--lr', default=0.01, type=float)
+
+    parser.add_argument('--lr_schedule', default='ReduceLROnPlateau')
+    parser.add_argument('--lr_params', default="{'monitor': 'val_loss', 'factor':0.1, 'patience':5, 'min_lr':1e-6}")
+
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--clipnorm', default=5, type=float)
     parser.add_argument('--batch_size', default=32, type=int)
@@ -54,9 +59,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--text_parser', type=str, default='simple_char_parser')
 
-    parser.add_argument('--save', default=os.path.join('results', str(uuid.uuid1())), type=str)
+    parser.add_argument('--save', default=None, type=str)
 
     parser.add_argument('--gpu', default='0', type=str)
+    parser.add_argument('--allow_growth', default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -68,13 +74,10 @@ if __name__ == '__main__':
             args.gpu = ''
         config = tf.ConfigProto()
         config.gpu_options.visible_device_list = args.gpu
+    if args.allow_growth == True:
+        config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
     K.set_session(session)
-
-    # Creating the results folder
-    name = args.save
-    if not os.path.isdir(name):
-        os.makedirs(name)
 
     # Recovering all valid models
     valid_models = get_functions_from_module('core.models')
@@ -96,11 +99,25 @@ if __name__ == '__main__':
                   optimizer=opt, metrics={'decoder': metrics.ler},
                   loss_weights=[1, 0])
 
+    # Creating the results folder
+    name = args.save
+    if name is None:
+        name = os.path.join('results', '%s_%s' % (args.model, datetime.datetime.now()))
+    if not os.path.isdir(name):
+        os.makedirs(name)
+
     # Callbacks
     meta_ckpt = MetaCheckpoint(os.path.join(name, 'meta.yaml'), training_args=vars(args))
     model_ckpt = ModelCheckpoint(os.path.join(name, 'model.h5'))
     best_ckpt = ModelCheckpoint(os.path.join(name, 'best.h5'), monitor='val_decoder_ler', save_best_only=True, mode='min')
     callback_list = [meta_ckpt, model_ckpt, best_ckpt]
+
+    # LR schedules
+    lr_params = HParams()
+    lr_params.parse(args.lr_params)
+    if args.lr_schedule is not None and args.lr_schedule == 'ReduceLROnPlateau':
+        reduce_lr = ReduceLROnPlateau(*lr_params.keyvals)
+        callback_list.append(reduce_lr)
 
     # Features extractor
     feats_params = HParams()
@@ -108,7 +125,7 @@ if __name__ == '__main__':
     if args.feats == 'mfcc':
         feats_extractor = audio.MFCC(*feats_params.keyvals)
     elif args.feats == 'logfbank':
-        feats_extractor = audio.LogFBank(*feats_params.keyvals)
+        feats_extractor = audio.LogFbank(*feats_params.keyvals)
     else:
         feats_extractor = None
 
@@ -144,4 +161,4 @@ if __name__ == '__main__':
     model.fit_generator(train_flow, samples_per_epoch=train_flow.len, nb_epoch=args.nb_epoch, validation_data=valid_flow, nb_val_samples=nb_val_samples, max_q_size=10, nb_worker=1, callbacks=callback_list, verbose=1)
 
     if test_flow:
-        metrics = model.evaluate_generator(test_flow, max_q_size=10, nb_worker=1)
+        metrics = model.evaluate_generator(test_flow, test_flow.len, max_q_size=10, nb_worker=1)
