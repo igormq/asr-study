@@ -31,6 +31,10 @@ def ctc_model(input_, output):
     return Model(input=[input_, labels, input_length], output=[l, y_pred])
 
 def graves2006(hparams=None):
+    """ Implementation of Graves' model
+    Reference:
+        [1] Graves, Alex, et al. "Connectionist temporal classification: labelling unsegmented sequence data with recurrent neural networks." Proceedings of the 23rd international conference on Machine learning. ACM, 2006.
+    """
     params = HParams(nb_features=26,
                      nb_hidden=100,
                      nb_classes=28,
@@ -49,41 +53,20 @@ def graves2006(hparams=None):
 
     return ctc_model(x, o)
 
-def graves2012m(hparams=None):
-    params = HParams(nb_features=26,
-                     nb_classes=28,
-                     nb_hidden=250,
-                     nb_layers=3,
-                     reg_W=0,
-                     reg_U=0,
-                     drop_W=0,
-                     drop_U=0)
-
-    params.parse(hparams)
-
-    x = Input(name='input', shape=(None, params.nb_features))
-    o = x
-
-    for _ in range(params.nb_layers):
-        o = Bidirectional(LSTM(params.nb_hidden,
-                          return_sequences=True,
-                          W_regularizer=l2(params.reg_W),
-                          U_regularizer=l2(params.reg_U),
-                          dropout_W=params.drop_W,
-                          dropout_U=params.drop_U,
-                          consume_less='gpu'))(o)
-
-    o = TimeDistributed(Dense(params.nb_classes))(o)
-
-    return ctc_model(x, o)
-
-def vardropout(hparams)
+def bayesian_lstm(hparams):
+    """ LSTM with variational dropout and weight decay. Following the best toplogy of [2] (without a transducer).
+    Note:
+        Dropout is tied through layers, and weights and the same for weight decay, minimizing the number of hyper parameters
+    Reference:
+        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in Recurrent Neural Networks", 2015.
+        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech recognition with deep recurrent neural networks", 2013.
+    """
     params = HParams(nb_features=39,
                      nb_classes=28,
                      nb_hidden=256,
                      nb_layers=3,
                      dropout=0.25,
-                     input_dropout=True,
+                     input_dropout=False,
                      weight_decay=1e-4)
 
     params.parse(hparams)
@@ -99,13 +82,11 @@ def vardropout(hparams)
                           return_sequences=True,
                           W_regularizer=l2(params.weight_decay),
                           U_regularizer=l2(params.weight_decay),
-                          b_regularizer=l2(params.weight_decay),
                           dropout_W=params.dropout,
                           dropout_U=params.dropout,
                           consume_less='gpu'))(o)
 
     o = TimeDistributed(Dense(params.nb_classes,
-                              W_regularizer=l2(params.weight_decay,
-                              b_regularizer=l2(params.weight_decay))))(o)
+                              W_regularizer=l2(params.weight_decay)))(o)
 
     return ctc_model(x, o)
