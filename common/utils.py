@@ -57,7 +57,7 @@ def get_custom_objects():
 
     return dict(all_custom_objects)
 
-def model_loader(model_fname):
+def load_model(model_fname):
     """ Loading keras model with custom objects
     """
     model = keras.models.load_model(model_fname, custom_objects=get_custom_objects())
