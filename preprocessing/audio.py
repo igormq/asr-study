@@ -21,28 +21,33 @@ class Feature(object):
     All children class must implement __str__ and _call function.
 
     # Arguments
-        fs: sampling frequency of audio signal. If the audio has not this fs, it will be resampled
+        fs: sampling frequency of audio signal. If the audio has not this fs,
+        it will be resampled
         eps
     """
 
     def __init__(self, fs=16e3, eps=1e-14):
         self.fs = fs
         self.eps = eps
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
 
     def __call__(self, audio):
         """ This method load the audio and do the transformation of signal
 
         # Inputs
             audio:
-                if audio is a string and the file exists, the wave file will be loaded and resampled (if necessary) to fs
-                if audio is a ndarray or list and is not empty, it will make the transformation without any resampling
+                if audio is a string and the file exists, the wave file will
+                be loaded and resampled (if necessary) to fs
+                if audio is a ndarray or list and is not empty, it will make
+                the transformation without any resampling
 
         # Exception
             TypeError if audio were not recognized
 
         """
-        if (isinstance(audio, str) or isinstance(audio, unicode)) and os.path.isfile(audio):
+        if ((isinstance(audio, str) or isinstance(audio, unicode)) and
+            os.path.isfile(audio)):
             audio, current_fs = librosa.audio.load(audio)
             audio = librosa.core.resample(audio, current_fs, self.fs)
             return self._call(audio)
@@ -50,17 +55,18 @@ class Feature(object):
         if type(audio) in (np.ndarray, list) and len(audio) > 1:
             return self._call(audio)
 
-        raise TypeError, "audio type is not support"
+        raise TypeError("audio type is not support")
 
     def _call(self, data):
-        raise NotImplementedError, "__call__ must be overrided"
+        raise NotImplementedError("__call__ must be overrided")
 
     def __str__(self):
-        raise NotImplementedError, "__str__ must be overrided"
+        raise NotImplementedError("__str__ must be overrided")
 
     @property
     def num_feats(self):
-        raise NotImplementedError, "num_feats must be overrided"
+        raise NotImplementedError("num_feats must be overrided")
+
 
 class FBank(Feature):
     """Compute Mel-filterbank energy features from an audio signal.
@@ -88,20 +94,19 @@ class FBank(Feature):
 
         super(FBank, self).__init__(**kwargs)
 
-        if high_freq > self.fs/2:
-            raise ValueError, "high_freq must be less or equal than fs/2"
+        if high_freq > self.fs / 2:
+            raise ValueError("high_freq must be less or equal than fs/2")
 
         self.win_len = win_len
         self.win_step = win_step
         self.num_filt = num_filt
         self.nfft = nfft
         self.low_freq = low_freq
-        self.high_freq = high_freq or self.fs/2
+        self.high_freq = high_freq or self.fs / 2
         self.pre_emph = pre_emph
         self.win_fun = win_fun
 
         self._filterbanks = self._get_filterbanks()
-
 
     @property
     def mel_points(self):
@@ -125,21 +130,23 @@ class FBank(Feature):
         self._high_mel = self._hz2mel(value)
         self._high_freq = value
 
-
     def _call(self, signal):
         """Compute Mel-filterbank energy features from an audio signal.
-        :param signal: the audio signal from which to compute features. Should be an N*1 array
+        :param signal: the audio signal from which to compute features. Should
+        be an N*1 array
 
         Returns:
-            2 values. The first is a numpy array of size (NUMFRAMES by nfilt) containing features. Each row holds 1 feature vector. The
-            second return value is the energy in each frame (total energy, unwindowed)
+            2 values. The first is a numpy array of size (NUMFRAMES by nfilt)
+            containing features. Each row holds 1 feature vector. The
+            second return value is the energy in each frame (total energy,
+            unwindowed)
         """
 
         signal = sigproc.preemphasis(signal, self.pre_emph)
 
         frames = sigproc.framesig(signal,
-                                  self.win_len*self.fs,
-                                  self.win_step*self.fs,
+                                  self.win_len * self.fs,
+                                  self.win_step * self.fs,
                                   self.win_fun)
 
         pspec = sigproc.powspec(frames, self.nfft)
@@ -156,50 +163,57 @@ class FBank(Feature):
         return feat, energy
 
     def _get_filterbanks(self):
-        """Compute a Mel-filterbank. The filters are stored in the rows, the columns correspond
-        to fft bins. The filters are returned as an array of size nfilt * (nfft/2 + 1)
+        """Compute a Mel-filterbank. The filters are stored in the rows, the
+        columns correspond
+        to fft bins. The filters are returned as an array of size nfilt *
+        (nfft / 2 + 1)
 
         Returns:
-            A numpy array of size num_filt * (nfft/2 + 1) containing filterbank. Each row holds 1 filter.
+            A numpy array of size num_filt * (nfft/2 + 1) containing
+            filterbank. Each row holds 1 filter.
         """
 
         # our points are in Hz, but we use fft bins, so we have to convert
         #  from Hz to fft bin number
-        bin = np.floor((self.nfft+1)*self._mel2hz(self.mel_points)/self.fs)
+        bin = np.floor((self.nfft + 1) * self._mel2hz(self.mel_points) /
+                       self.fs)
 
-        fbank = np.zeros([self.num_filt, int(self.nfft/2+1)])
+        fbank = np.zeros([self.num_filt, int(self.nfft / 2 + 1)])
         for j in xrange(0, self.num_filt):
-            for i in xrange(int(bin[j]), int(bin[j+1])):
-                fbank[j, i] = (i - bin[j])/(bin[j+1]-bin[j])
-            for i in xrange(int(bin[j+1]), int(bin[j+2])):
-                fbank[j, i] = (bin[j+2]-i)/(bin[j+2]-bin[j+1])
+            for i in xrange(int(bin[j]), int(bin[j + 1])):
+                fbank[j, i] = (i - bin[j]) / (bin[j + 1] - bin[j])
+            for i in xrange(int(bin[j + 1]), int(bin[j + 2])):
+                fbank[j, i] = (bin[j + 2] - i) / (bin[j + 2] - bin[j + 1])
         return fbank
 
     def _hz2mel(self, hz):
         """Convert a value in Hertz to Mels
 
         Args:
-            hz: a value in Hz. This can also be a numpy array, conversion proceeds element-wise.
+            hz: a value in Hz. This can also be a numpy array, conversion
+            proceeds element-wise.
 
         Returns:
-            A value in Mels. If an array was passed in, an identical sized array is returned.
+            A value in Mels. If an array was passed in, an identical sized
+            array is returned.
         """
-        return 2595 * np.log10(1+hz/700.0)
+        return 2595 * np.log10(1 + hz / 700.0)
 
     def _mel2hz(self, mel):
         """Convert a value in Mels to Hertz
 
         Args:
-            mel: a value in Mels. This can also be a numpy array, conversion proceeds element-wise.
+            mel: a value in Mels. This can also be a numpy array, conversion
+            proceeds element-wise.
 
         Returns:
-            A value in Hertz. If an array was passed in, an identical sized array is returned.
+            A value in Hertz. If an array was passed in, an identical sized
+            array is returned.
         """
-        return 700*(10**(mel/2595.0)-1)
+        return 700 * (10**(mel / 2595.0) - 1)
 
     def __str__(self):
         return "fbank"
-
 
     def num_feats(self):
         return self.num_filt
@@ -229,7 +243,8 @@ class MFCC(FBank):
         self.d = d
         self.dd = dd
 
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
 
     def _call(self, signal):
         """Compute MFCC features from an audio signal.
@@ -276,8 +291,8 @@ class MFCC(FBank):
         if L > 0:
             nframes, ncoeff = np.shape(cepstra)
             n = np.arange(ncoeff)
-            lift = 1 + (L/2)*np.sin(np.pi*n/L)
-            return lift*cepstra
+            lift = 1 + (L / 2) * np.sin(np.pi * n / L)
+            return lift * cepstra
         else:
             # values of L <= 0, do nothing
             return cepstra
@@ -289,11 +304,13 @@ class MFCC(FBank):
     def num_feats(self):
         return (1 + self.d + self.dd) * self.num_cep
 
+
 class LogFbank(FBank):
     """Compute Mel-filterbank energy features from an audio signal.
 
     # Arguments
-        append_energy: if this is true, log of the total frame energy is append to the features vector. Default False
+        append_energy: if this is true, log of the total frame energy is
+        append to the features vector. Default False
         d: if True add deltas coeficients. Default False
         dd: if True add delta-deltas coeficients. Default False
     """
@@ -308,14 +325,17 @@ class LogFbank(FBank):
         self.dd = dd
         self.append_energy = append_energy
 
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
 
     def _call(self, signal):
         """Compute log Mel-filterbank energy features from an audio signal.
-        :param signal: the audio signal from which to compute features. Should be an N*1 array
+        :param signal: the audio signal from which to compute features. Should
+        be an N*1 array
 
         Returns:
-             A numpy array of size (NUMFRAMES by nfilt) containing features. Each row holds 1 feature vector.
+             A numpy array of size (NUMFRAMES by nfilt) containing features.
+             Each row holds 1 feature vector.
         """
 
         feat, energy = super(LogFbank, self)._call(signal)
@@ -324,7 +344,6 @@ class LogFbank(FBank):
 
         if self.append_energy:
             feat = np.hstack([feat, np.log(energy + self.eps)[:, np.newaxis]])
-
 
         if self.d:
             d = delta(feat, 2)
@@ -342,6 +361,7 @@ class LogFbank(FBank):
     def num_feats(self):
         return (1 + self.d + self.dd) * (self.num_filt + self.append_energy)
 
+
 class Raw(Feature):
     """ Raw features extractor
     """
@@ -357,5 +377,6 @@ class Raw(Feature):
     @property
     def num_feats(self):
         return None
+
 
 raw = Raw()

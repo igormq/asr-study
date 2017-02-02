@@ -67,8 +67,8 @@ class DatasetGenerator(object):
             h5_f = h5py.File(fname, 'r')
 
             feat_group = h5_f['raw']
-            if self.feature_extractor is not None and \
-               str(self.feature_extractor) in h5_f.keys():
+            if (self.feature_extractor is not None
+                and str(self.feature_extractor) in h5_f.keys()):
                 feat_group = h5_f[str(self.feature_extractor)]
                 self.feature_extractor = None
 
@@ -110,8 +110,8 @@ class DatasetGenerator(object):
             h5_f = h5py.File(fname, 'r')
 
             feat_group = h5_f['raw']
-            if self.feature_extractor is not None and \
-               str(self.feature_extractor) in h5_f.keys():
+            if (self.feature_extractor is not None and
+                str(self.feature_extractor) in h5_f.keys()):
                 feat_group = h5_f[str(self.feature_extractor)]
                 # it's not necessary, feature already exists
                 self.feature_extractor = None
@@ -247,11 +247,13 @@ class DatasetIterator(Iterator):
 
         # Copy from DirectoryIterator from keras
         with self.lock:
-            index_array, current_index, current_batch_size = next(self.index_generator)
+            index_array, current_index, current_batch_size = next(
+                self.index_generator)
 
         index_array.sort()
 
-        batch_inputs, batch_seq_len = self._make_in(self.inputs[index_array.tolist()], current_batch_size)
+        batch_inputs, batch_seq_len = self._make_in(
+            self.inputs[index_array.tolist()], current_batch_size)
 
         batch_labels = self._make_out(self.labels[index_array.tolist()],
                                       current_batch_size)
@@ -259,8 +261,8 @@ class DatasetIterator(Iterator):
         return self._make_in_out(batch_inputs, batch_labels, batch_seq_len)
 
     def _make_in_out(self, batch_inputs, batch_labels, batch_seq_len=None):
-        return [batch_inputs, batch_labels, batch_seq_len],
-        [np.zeros((batch_inputs.shape[0],)), batch_labels]
+        return ([batch_inputs, batch_labels, batch_seq_len],
+                [np.zeros((batch_inputs.shape[0],)), batch_labels])
 
     def _make_in(self, inputs, batch_size=None):
         if self.feature_extractor is not None:
@@ -339,6 +341,7 @@ class JSONIterator(DatasetIterator):
         super(JSONIterator, self).__init__(inputs, labels, **kwargs)
 
         self.durations = np.array(data['duration'])
+
 
 class DictListIterator(DatasetIterator):
 
