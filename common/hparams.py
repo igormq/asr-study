@@ -1,5 +1,6 @@
 import ast
 
+
 class HParams(object):
     """Creates an object for passing around hyperparameter values.
     Use the parse method to overwrite the default hyperparameters with values
@@ -19,6 +20,17 @@ class HParams(object):
         if from_str:
             self.parse(from_str)
 
+    def __getitem__(self, key):
+        """Returns value of the given hyperameter, or None if does not
+        exist."""
+        return self.keyvals.get(key)
+
+    def __getattribute__(self, attribute):
+        if attribute == '__dict__':
+            return self.keyvals
+        else:
+            return object.__getattribute__(self, attribute)
+
     def __getattr__(self, key):
         """Returns value of the given hyperameter, or None if does not
         exist."""
@@ -32,6 +44,8 @@ class HParams(object):
         """Merges in new hyperparameters, replacing existing with same key."""
         self.keyvals.update(values_dict)
 
+        return self
+
     def parse(self, values_string):
         """Merges in new hyperparameters, replacing existing with same key."""
         self.update(ast.literal_eval(values_string))
@@ -41,3 +55,6 @@ class HParams(object):
     def values(self):
         """Return the hyperparameter values as a Python dictionary."""
         return self.keyvals
+
+    def __str__(self):
+        return str(self.keyvals)
