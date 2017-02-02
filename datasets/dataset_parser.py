@@ -17,13 +17,13 @@ class DatasetParser(object):
     '''
 
     def __init__(self, dt_dir=None, name=None,
-                 text_parser=text.CharParser('s|b|a|p')):
+                 text_parser=text.CharParser('s|S|a|p')):
         self.dt_dir = dt_dir
+        self._name = name
         self.output_dir = os.path.join(DT_ABSPATH, self.name)
         self.json_fname = os.path.join(self.output_dir, 'data.json')
         self.h5_fname = os.path.join(self.output_dir, 'data.h5')
         self.text_parser = text_parser
-        self._name = name
 
         self.has_json = False
         if os.path.isfile(self.json_fname):
@@ -142,8 +142,7 @@ class DatasetParser(object):
 
                 feats, labels, durations = get_groups(data)
 
-                audio_fname, label, duration = data['audio'], data['label'],
-                data['duration']
+                audio_fname, label, duration = data['audio'], data['label'], data['duration']
                 feat = feat_map(audio_fname)
 
                 feats.resize(feats.shape[0] + 1, axis=0)

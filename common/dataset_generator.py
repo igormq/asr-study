@@ -67,8 +67,8 @@ class DatasetGenerator(object):
             h5_f = h5py.File(fname, 'r')
 
             feat_group = h5_f['raw']
-            if (self.feature_extractor is not None
-                and str(self.feature_extractor) in h5_f.keys()):
+            if (self.feature_extractor is not None and
+                str(self.feature_extractor) in h5_f.keys()):
                 feat_group = h5_f[str(self.feature_extractor)]
                 self.feature_extractor = None
 

@@ -25,8 +25,8 @@ class VoxForge(DatasetParser):
 
         super(VoxForge, self).__init__(**kwargs)
 
-        if self.dt_dir is not None and
-        os.path.isdir(os.path.join(self.dt_dir, 'files')):
+        if (self.dt_dir is not None and
+            os.path.isdir(os.path.join(self.dt_dir, 'files'))):
 
             self.dt_dir = os.path.join(self.dt_dir, 'files')
 
