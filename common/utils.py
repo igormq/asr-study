@@ -19,6 +19,7 @@ import inspect
 
 import core
 
+
 def safe_mkdirs(path):
     ''' Safe makedirs
     Directory is created with command `makedir -p`.
@@ -30,13 +31,14 @@ def safe_mkdirs(path):
     try:
         os.makedirs(path)
     except OSError, e:
-        if e.errno != 17: # 17 = file exists
+        if e.errno != 17:  # 17 = file exists
             raise
 
     return path
 
+
 def get_from_module(module, name):
-    members = dict(inspect.getmembers(sys.modules[module], lambda member: hasattr(member, '__module__') and member.__module__ == module))
+    members = inspect_module(module)
 
     if name is None or name.lower() == 'none':
         return None
@@ -46,40 +48,57 @@ def get_from_module(module, name):
     try:
         return members[name.lower().strip()]
     except KeyError, e:
-        raise KeyError, "%s not found in %s.\n Valid values are: %s" % (name, module, ', '.join(members.keys()))
+        raise KeyError("%s not found in %s.\n Valid values are: %s" %
+                       (name, module, ', '.join(members.keys())))
+
+
+def inspect_module(module, to_dict=True):
+    members = inspect.getmembers(sys.modules[module], lambda member:
+                                 hasattr(member, '__module__') and
+                                 member.__module__ == module)
+    if to_dict:
+        return dict(members)
+
+    return members
+
 
 def get_custom_objects():
     """ Verify all custom object that may be used to load a keras model
     """
     all_custom_objects = []
-    for module in ['core.layers', 'core.layers_utils', 'core.metrics', 'core.ctc_utils']:
-        all_custom_objects.extend(inspect.getmembers(sys.modules[module], lambda member: (inspect.isclass(member) or inspect.isfunction(member)) and member.__module__ == module))
+    for module in ['core.layers', 'core.layers_utils',
+                   'core.metrics', 'core.ctc_utils']:
+        all_custom_objects.extend(inspect_module(module, to_dict=False))
 
     return dict(all_custom_objects)
+
 
 def load_model(model_fname):
     """ Loading keras model with custom objects
     """
-    model = keras.models.load_model(model_fname, custom_objects=get_custom_objects())
+    model = keras.models.load_model(model_fname,
+                                    custom_objects=get_custom_objects())
     return model
+
 
 def ld2dl(ld):
     '''Transform a list of dictionaries in a dictionaries with lists
     # Note
         All dictionaries have the same keys
     '''
-    return dict(zip(ld[0],zip(*[d.values() for d in ld])))
+    return dict(zip(ld[0], zip(*[d.values() for d in ld])))
+
 
 def config_gpu(gpu, allow_growth=False):
     # Choosing gpu
     if gpu == '-1':
-        config = tf.ConfigProto(device_count = {'GPU': 0})
+        config = tf.ConfigProto(device_count={'GPU': 0})
     else:
         if gpu == 'all':
             gpu = ''
         config = tf.ConfigProto()
         config.gpu_options.visible_device_list = gpu
-    if allow_growth == True: # dynamic gpu memory allocation
+    if allow_growth:  # dynamic gpu memory allocation
         config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
     K.set_session(session)

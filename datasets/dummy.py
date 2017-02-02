@@ -8,23 +8,30 @@ import tempfile
 
 import numpy as np
 
+
 class Dummy(DatasetParser):
     """ Fake dataset reader and parser to do some tests
 
     # Arguments
         nb_speakers: number of speakers
-        nb_utterances_per_speaker: number of utterances that each speaker will have
+        nb_utterances_per_speaker: number of utterances that each speaker will
+        have
         max_duration: max duration in seconds of each fake audio
         min_duration: min duration in seconds of each fake audio
         max_label_length: max size of each fake label
         fs: sampling frequency of each fake audio
-        split: list with two values. It will divide this dataset in three sets (train, valid and test) given the proportions
+        split: list with two values. It will divide this dataset in three sets
+        (train, valid and test) given the proportions
     """
 
-    def __init__(self, nb_speakers=10, nb_utterances_per_speaker=10, max_duration=10.0, min_duration=1.0, max_label_length=200, fs=16e3, split=None, **kwargs):
+    def __init__(self, nb_speakers=10, nb_utterances_per_speaker=10,
+                 max_duration=10.0, min_duration=1.0, max_label_length=200,
+                 fs=16e3, split=None, **kwargs):
         '''
         Args:
-            split: list or nparray of size 2 that splits the data between train, valid and test. example: split = [.8 .15] = 80% train, 15% valid and 5% test
+            split: list or nparray of size 2 that splits the data between
+            train, valid and test. example: split = [.8 .15] = 80% train, 15%
+            valid and 5% test
         '''
 
         kwargs.setdefault('name', 'dummy')
@@ -50,9 +57,10 @@ class Dummy(DatasetParser):
         for speaker in range(self.nb_speakers):
             for utterance in range(self.nb_utterances_per_speaker):
 
-                duration = np.random.uniform(low=self.min_duration, high=self.max_duration)
+                duration = np.random.uniform(low=self.min_duration,
+                                             high=self.max_duration)
 
-                samples = np.floor(duration*self.fs)
+                samples = np.floor(duration * self.fs)
                 audio = np.random.randn(int(samples))
 
                 audio_file = tempfile.NamedTemporaryFile(delete=False)
@@ -61,18 +69,21 @@ class Dummy(DatasetParser):
 
                 librosa.output.write_wav(audio_fname, audio, self.fs)
 
-                label = np.random.randint(low=ord('a'), high=ord('z'), size=(np.random.randint(2, self.max_label_length),))
+                label = np.random.randint(
+                    low=ord('a'), high=ord('z'),
+                    size=(np.random.randint(2, self.max_label_length),))
+
                 label = ''.join([chr(l) for l in label])
 
                 data = {'duration': duration,
-                       'audio': audio_fname,
-                       'label': label,
-                       'speaker': 'speaker_%d' % speaker}
+                        'audio': audio_fname,
+                        'label': label,
+                        'speaker': 'speaker_%d' % speaker}
 
                 if self.split is not None:
-                    if counter < np.floor(self.split[0]*total):
+                    if counter < np.floor(self.split[0] * total):
                         dt = 'train'
-                    elif counter < np.floor(np.sum(self.split)*total):
+                    elif counter < np.floor(np.sum(self.split) * total):
                         dt = 'valid'
                     else:
                         dt = 'test'
@@ -86,6 +97,8 @@ class Dummy(DatasetParser):
         report = '''General information
                 Number of utterances: %d
                 Total size (in seconds) of utterances: %.f
-                Number of speakers: %d''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])))
+                Number of speakers: %d''' % (len(dl['audio']),
+                                             sum(dl['duration']),
+                                             len(set(dl['speaker'])))
 
         return report

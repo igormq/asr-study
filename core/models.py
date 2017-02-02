@@ -7,12 +7,25 @@ from common.hparams import HParams
 
 import keras
 from keras.initializations import uniform
+
 from keras.models import Model
-from keras.layers import Input, GaussianNoise, TimeDistributed, Dense, LSTM, Masking, Bidirectional, Lambda, Dropout
+
+from keras.layers import Input
+from keras.layers import GaussianNoise
+from keras.layers import TimeDistributed
+from keras.layers import Dense
+from keras.layers import LSTM
+from keras.layers import Masking
+from keras.layers import Bidirectional
+from keras.layers import Lambda
+from keras.layers import Dropout
+
 from keras.regularizers import l1, l2, l1l2
 
+
 def ctc_model(input_, output, **kwargs):
-    """ Given the input and output returns a model appending ctc_loss and the decoder
+    """ Given the input and output returns a model appending ctc_loss and the
+    decoder
 
     # Arguments
         see core.ctc_utils.layer_utils.decode for more arguments
@@ -29,14 +42,18 @@ def ctc_model(input_, output, **kwargs):
 
     ctc = Lambda(ctc_utils.ctc_lambda_func, output_shape=(1,), name="ctc")
     # Define loss as a layer
-    l = ctc([output, labels, input_length])
+    loss = ctc([output, labels, input_length])
 
-    return Model(input=[input_, labels, input_length], output=[l, y_pred])
+    return Model(input=[input_, labels, input_length], output=[loss, y_pred])
+
 
 def graves2006(hparams=None):
     """ Implementation of Graves' model
     Reference:
-        [1] Graves, Alex, et al. "Connectionist temporal classification: labelling unsegmented sequence data with recurrent neural networks." Proceedings of the 23rd international conference on Machine learning. ACM, 2006.
+        [1] Graves, Alex, et al. "Connectionist temporal classification:
+        labelling unsegmented sequence data with recurrent neural networks."
+        Proceedings of the 23rd international conference on Machine learning.
+        ACM, 2006.
     """
     params = HParams(nb_features=26,
                      nb_hidden=100,
@@ -56,13 +73,18 @@ def graves2006(hparams=None):
 
     return ctc_model(x, o)
 
+
 def bayesian_lstm(hparams):
-    """ LSTM with variational dropout and weight decay. Following the best topology of [2] (without a transducer).
+    """ LSTM with variational dropout and weight decay. Following the best
+    topology of [2] (without a transducer).
     Note:
-        Dropout is tied through layers, and weights and the same for weight decay, minimizing the number of hyper parameters
+        Dropout is tied through layers, and weights and the same for weight
+        decay, minimizing the number of hyper parameters
     Reference:
-        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in Recurrent Neural Networks", 2015.
-        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech recognition with deep recurrent neural networks", 2013.
+        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in
+        Recurrent Neural Networks", 2015.
+        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech
+        recognition with deep recurrent neural networks", 2013.
     """
     params = HParams(nb_features=39,
                      nb_classes=28,

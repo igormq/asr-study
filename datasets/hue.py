@@ -6,15 +6,21 @@ import re
 import librosa
 import codecs
 
+
 class HUE(DatasetParser):
     """ HUE dataset reader and parser
 
-    This dataset is a combination of four smaller datasets (voxforge, lapsbm, sidney, and cslu spoltech port). The dataset was divided in the following way:
+    This dataset is a combination of four smaller datasets (voxforge, lapsbm,
+    sidney, and cslu spoltech port). The dataset was divided in the following
+    way:
         * Train: voxforge, sidney, and cslu spoltech port
         * Valid: 5 women and 15 men from LaspBM
-        * Test: 5 women 10 men from LapsBM (without overlapping with valid set either in speaker and utterance spoken)
+        * Test: 5 women 10 men from LapsBM (without overlapping with valid set
+        either in speaker and utterance spoken)
 
-    After cleaning (removing label with zero length, label with numeric digits, e.g., 4 instead of four) the training set contains 11702 utterances with 425 speakers.
+    After cleaning (removing label with zero length, label with numeric
+    digits, e.g., 4 instead of four) the training set contains 11702
+    utterances with 425 speakers.
 
     """
 

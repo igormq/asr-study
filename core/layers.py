@@ -15,6 +15,7 @@ from .layers_utils import multiplicative_integration
 
 import warnings
 
+
 class LayerNormalization(Layer):
     '''Normalize from all of the summed inputs to the neurons in a layer on
     a single training case. Unlike batch normalization, layer normalization
@@ -30,11 +31,13 @@ class LayerNormalization(Layer):
         gain_init: name of initialization function for gain parameter
             (see [initializations](../initializations.md)), or alternatively,
             Theano/TensorFlow function to use for weights initialization.
-            This parameter is only relevant if you don't pass a `weights` argument.
+            This parameter is only relevant if you don't pass a `weights`
+            argument.
         bias_init: name of initialization function for bias parameter
             (see [initializations](../initializations.md)), or alternatively,
             Theano/TensorFlow function to use for weights initialization.
-            This parameter is only relevant if you don't pass a `weights` argument.
+            This parameter is only relevant if you don't pass a `weights`
+            argument.
     # Input shape
 
     # Output shape
@@ -78,6 +81,7 @@ class LayerNormalization(Layer):
         base_config = super(LayerNormalization, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
+
 class RHN(Recurrent):
     '''Recurrent Highway Network - Julian Georg Zilly, Rupesh Kumar Srivastava,
     Jan Koutník, Jürgen Schmidhuber - 2016.
@@ -88,10 +92,12 @@ class RHN(Recurrent):
         depth: recurrency depth size.
         init: weight initialization function.
             Can be the name of an existing function (str),
-            or a Theano function (see: [initializations](../initializations.md)).
+            or a Theano function (see:
+            [initializations](../initializations.md)).
         inner_init: initialization function of the inner cells.
         bias_init: initialization function of the bias.
-            (see [this post](http://people.idsia.ch/~rupesh/very_deep_learning/)
+            (see [this
+            post](http://people.idsia.ch/~rupesh/very_deep_learning/)
             for more information)
         activation: activation function.
             Can be the name of an existing function (str),
@@ -100,24 +106,31 @@ class RHN(Recurrent):
         coupling: if True, carry gate will be coupled to the transform gate,
             i.e., c = 1 - t
         W_regularizer: instance of [WeightRegularizer](../regularizers.md)
-            (eg. L1 or L2 regularization), applied to the input weights matrices.
+            (eg. L1 or L2 regularization), applied to the input weights
+            matrices.
         U_regularizer: instance of [WeightRegularizer](../regularizers.md)
-            (eg. L1 or L2 regularization), applied to the recurrent weights matrices.
+            (eg. L1 or L2 regularization), applied to the recurrent weights
+            matrices.
         b_regularizer: instance of [WeightRegularizer](../regularizers.md),
             applied to the bias.
-        dropout_W: float between 0 and 1. Fraction of the input units to drop for input gates.
-        dropout_U: float between 0 and 1. Fraction of the input units to drop for recurrent connections.
+        dropout_W: float between 0 and 1. Fraction of the input units to drop
+        for input gates.
+        dropout_U: float between 0 and 1. Fraction of the input units to drop
+        for recurrent connections.
     # References
-        - [Recurrent Highway Networks](https://arxiv.org/abs/1607.03474) (original paper)
+        - [Recurrent Highway Networks](https://arxiv.org/abs/1607.03474)
+        (original paper)
         - [Layer Normalization](https://arxiv.org/abs/1607.06450)
-        - [A Theoretically Grounded Application of Dropout in Recurrent Neural Networks](http://arxiv.org/abs/1512.05287)
+        - [A Theoretically Grounded Application of Dropout in Recurrent Neural
+        Networks](http://arxiv.org/abs/1512.05287)
     # TODO: different dropout rates for each layer
     '''
     def __init__(self, output_dim, depth=1,
                  init='glorot_uniform', inner_init='orthogonal',
                  bias_init=highway_bias_initializer,
                  activation='tanh', inner_activation='hard_sigmoid',
-                 coupling=True, layer_norm=False, ln_gain_init='one', ln_bias_init='zero', mi=False,
+                 coupling=True, layer_norm=False, ln_gain_init='one',
+                 ln_bias_init='zero', mi=False,
                  W_regularizer=None, U_regularizer=None,
                  b_regularizer=None, dropout_W=0., dropout_U=0., **kwargs):
         self.output_dim = output_dim
@@ -143,7 +156,8 @@ class RHN(Recurrent):
         super(RHN, self).__init__(**kwargs)
 
         if not self.consume_less == "gpu":
-            warnings.warn("Ignoring consume_less=%s. Setting to 'gpu'." % self.consume_less)
+            warnings.warn("Ignoring consume_less=%s. Setting to 'gpu'." %
+                          self.consume_less)
 
     def build(self, input_shape):
         self.input_spec = [InputSpec(shape=input_shape)]
@@ -154,11 +168,11 @@ class RHN(Recurrent):
         else:
             self.states = [None]
 
-
-        self.W = self.init((self.input_dim, (2 + (not self.coupling)) * self.output_dim),
-                           name='{}_W'.format(self.name))
-        self.Us = [self.inner_init((self.output_dim, (2 + (not self.coupling)) * self.output_dim),
-                                    name='%s_%d_U' %(self.name, i)) for i in xrange(self.depth)]
+        self.W = self.init((self.input_dim, (2 + (not self.coupling)) *
+                            self.output_dim), name='{}_W'.format(self.name))
+        self.Us = [self.inner_init(
+            (self.output_dim, (2 + (not self.coupling)) * self.output_dim),
+            name='%s_%d_U' % (self.name, i)) for i in xrange(self.depth)]
 
         bias_init_value = K.get_value(self.bias_init((self.output_dim,)))
         b = [np.zeros(self.output_dim),
@@ -167,12 +181,17 @@ class RHN(Recurrent):
         if not self.coupling:
             b.append(np.copy(bias_init_value))
 
-        self.bs = [K.variable(np.hstack(b), name='%s_%d_b' %(self.name, i)) for i in xrange(self.depth)]
+        self.bs = [K.variable(np.hstack(b),
+                              name='%s_%d_b' % (self.name, i)) for i in
+                   xrange(self.depth)]
 
-        self.trainable_weights = [self.W] + self.Us +  self.bs
+        self.trainable_weights = [self.W] + self.Us + self.bs
 
         if self.mi:
-            self.mi_params = [multiplicative_integration_init(((2 + (not self.coupling))*self.output_dim,), name='%s_%d' %(self.name, i), has_input=(i==0)) for i in xrange(self.depth)]
+            self.mi_params = [multiplicative_integration_init(
+                ((2 + (not self.coupling)) * self.output_dim,),
+                name='%s_%d' % (self.name, i),
+                has_input=(i == 0)) for i in xrange(self.depth)]
 
             for p in self.mi_params:
                 if type(p) in {list, tuple}:
@@ -184,10 +203,14 @@ class RHN(Recurrent):
             self.ln_weights = []
             ln_names = ['h', 't', 'c']
             for l in xrange(self.depth):
-                # ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
-                ln_gains = [self.ln_gain_init((self.output_dim,), name='%s_%d_ln_gain_%s' %(self.name, l, ln_names[i])) for i in xrange(1)]
-                # ln_biases = [self.ln_bias_init((self.output_dim,), name='%s_%d_ln_bias_%s' %(self.name, l, ln_names[i])) for i in xrange(2 + (not self.coupling))]
-                ln_biases = [self.ln_bias_init((self.output_dim,), name='%s_%d_ln_bias_%s' %(self.name, l, ln_names[i])) for i in xrange(1)]
+
+                ln_gains = [self.ln_gain_init(
+                    (self.output_dim,), name='%s_%d_ln_gain_%s' %
+                    (self.name, l, ln_names[i])) for i in xrange(1)]
+
+                ln_biases = [self.ln_bias_init(
+                    (self.output_dim,), name='%s_%d_ln_bias_%s' %
+                    (self.name, l, ln_names[i])) for i in xrange(1)]
                 self.ln_weights.append([ln_gains, ln_biases])
                 self.trainable_weights += ln_gains + ln_biases
 
@@ -211,7 +234,8 @@ class RHN(Recurrent):
         input_shape = self.input_spec[0].shape
         if not input_shape[0]:
             raise Exception('If a RNN is stateful, a complete ' +
-                            'input_shape must be provided (including batch size).')
+                            'input_shape must be provided (including batch \
+                            size).')
         if hasattr(self, 'states'):
             K.set_value(self.states[0],
                         np.zeros((input_shape[0], self.output_dim)))
@@ -234,7 +258,8 @@ class RHN(Recurrent):
             Us = K.dot(s_tm1 * B_U, U)
 
             if self.mi:
-                a =  multiplicative_integration(Wx, Us, self.mi_params[layer]) + b
+                a = multiplicative_integration(Wx, Us,
+                                               self.mi_params[layer]) + b
             else:
                 a = Wx + Us + b
 
@@ -251,18 +276,17 @@ class RHN(Recurrent):
                 #     a2 = layer_normalization(a2, ln_gains[2], ln_biases[2])
 
             # Equation 7
-            h =  self.activation(a0)
+            h = self.activation(a0)
             # Equation 8
             t = self.inner_activation(a1)
-            #Equation 9
+            # Equation 9
             if not self.coupling:
                 c = self.inner_activation(a2)
             else:
-                c = 1 - t # carry gate was coupled to the transform gate
+                c = 1 - t  # carry gate was coupled to the transform gate
 
-            s  = h * t + s_tm1 * c
+            s = h * t + s_tm1 * c
             s_tm1 = s
-
 
         return s, [s]
 
@@ -285,7 +309,8 @@ class RHN(Recurrent):
                     input_dim = input_shape[-1]
                     ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
                     ones = K.tile(ones, (1, input_dim))
-                    B_W = K.in_train_phase(K.dropout(ones, self.dropout_W), ones)
+                    B_W = K.in_train_phase(K.dropout(ones,
+                                                     self.dropout_W), ones)
                     constant.append(B_W)
                 else:
                     constant.append(K.cast_to_floatx(1.))
@@ -307,9 +332,12 @@ class RHN(Recurrent):
                   'ln_gain_init': self.ln_gain_init.__name__,
                   'ln_bias_init': self.ln_bias_init.__name__,
                   'mi': self.mi,
-                  'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
-                  'U_regularizer': self.U_regularizer.get_config() if self.U_regularizer else None,
-                  'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
+                  'W_regularizer': self.W_regularizer.get_config() if
+                  self.W_regularizer else None,
+                  'U_regularizer': self.U_regularizer.get_config() if
+                  self.U_regularizer else None,
+                  'b_regularizer': self.b_regularizer.get_config() if
+                  self.b_regularizer else None,
                   'dropout_W': self.dropout_W,
                   'dropout_U': self.dropout_U}
         base_config = super(RHN, self).get_config()
