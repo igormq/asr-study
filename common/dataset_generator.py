@@ -15,8 +15,10 @@ from preprocessing import audio, text
 
 from . import utils
 
+
 class DatasetGenerator(object):
-    """ Dataset generator that handles several forms of input and return an iterator over it. Only works for a CTC model
+    """ Dataset generator that handles several forms of input and return an
+    iterator over it. Only works for a CTC model
 
     # Arguments
         feature_extractor: instance of Feature [preprocessing.audio.Feature]
@@ -40,7 +42,8 @@ class DatasetGenerator(object):
         """ Returns an specific iterator given the filename
 
         # Arguments
-            dt_name: returns an iterator over an specific dataset name (e.g., train, valid or test)
+            dt_name: returns an iterator over an specific dataset name (e.g.,
+            train, valid or test)
 
         # Inputs
             fname: path to a file.
@@ -48,7 +51,8 @@ class DatasetGenerator(object):
                     It will try first read 'feat_name/dt_name' from h5
                     if feat_name doesn't exists will try raw
                     if dt_name doesn't exists will try ''
-                *json (JSON format) - a list of dictionary. Must have 'audio' and 'label' keys
+                *json (JSON format) - a list of dictionary. Must have 'audio'
+                and 'label' keys
                     if has key 'dt' will try to only read from specific dt_name
 
         # Outputs
@@ -60,10 +64,11 @@ class DatasetGenerator(object):
         dt_iter = None
 
         if h5py.is_hdf5(fname):
-            h5_f =  h5py.File(fname, 'r')
+            h5_f = h5py.File(fname, 'r')
 
             feat_group = h5_f['raw']
-            if self.feature_extractor is not None and str(self.feature_extractor) in h5_f.keys():
+            if (self.feature_extractor is not None
+                and str(self.feature_extractor) in h5_f.keys()):
                 feat_group = h5_f[str(self.feature_extractor)]
                 self.feature_extractor = None
 
@@ -81,14 +86,14 @@ class DatasetGenerator(object):
                 ld = json.load(json_f)
                 data = utils.ld2dl(ld)
 
-            if dt_name and data.has_key('dt') and dt_name in set(data['dt']):
+            if dt_name and 'dt' in data and dt_name in set(data['dt']):
                 dt_iter = self.flow_from_dl(data, dt_name)
             else:
                 dt_iter = self.flow_from_dl(data, None)
 
             return train_iter
 
-        raise ValueError, "Extension not recognized"
+        raise ValueError("Extension not recognized")
 
     def flows_from_fname(self, fname):
         """ Returns three iterators: train iterator, valid iterator and test iterator
@@ -102,12 +107,14 @@ class DatasetGenerator(object):
         train_iter, valid_iter, test_iter = None, None, None
 
         if h5py.is_hdf5(fname):
-            h5_f =  h5py.File(fname, 'r')
+            h5_f = h5py.File(fname, 'r')
 
             feat_group = h5_f['raw']
-            if self.feature_extractor is not None and str(self.feature_extractor) in h5_f.keys():
+            if (self.feature_extractor is not None and
+                str(self.feature_extractor) in h5_f.keys()):
                 feat_group = h5_f[str(self.feature_extractor)]
-                self.feature_extractor = None # it's not necessary, feature already exists
+                # it's not necessary, feature already exists
+                self.feature_extractor = None
 
             if 'train' in feat_group.keys():
                 train_iter = self.flow_from_h5(feat_group['train'])
@@ -129,7 +136,7 @@ class DatasetGenerator(object):
                 ld = json.load(json_f)
                 data = utils.ld2dl(ld)
 
-            if data.has_key('dt'):
+            if 'dt' in data:
                 dts = set(data['dt'])
                 if 'train' in dts:
                     train_iter = self.flow_from_dl(data, 'train')
@@ -144,41 +151,62 @@ class DatasetGenerator(object):
 
             return train_iter, valid_iter, test_iter
 
-        raise ValueError, "Extension not recognized"
+        raise ValueError("Extension not recognized")
 
     def flow_from_json(self, json_fname, dt_sel='train'):
         """ Returns JSONIterator given the filename"""
-        return JSONIterator(json_fname, dt_sel, batch_size=self.batch_size, shuffle=self.shuffle, seed=self.seed, feature_extractor=self.feature_extractor, text_parser=self.text_parser)
+        return JSONIterator(json_fname, dt_sel, batch_size=self.batch_size,
+                            shuffle=self.shuffle, seed=self.seed,
+                            feature_extractor=self.feature_extractor,
+                            text_parser=self.text_parser)
 
     def flow_from_dl(self, dl, dt_sel=None):
-        """ Return DictListIterator given a list of dictionaries. Each dictionary must have the keys 'input' and 'label'
+        """ Return DictListIterator given a list of dictionaries. Each
+        dictionary must have the keys 'input' and 'label'
         """
-        return DictListIterator(dl, dt_sel, batch_size=self.batch_size, shuffle=self.shuffle, seed=self.seed, feature_extractor=self.feature_extractor, text_parser=self.text_parser)
+        return DictListIterator(dl, dt_sel, batch_size=self.batch_size,
+                                shuffle=self.shuffle, seed=self.seed,
+                                feature_extractor=self.feature_extractor,
+                                text_parser=self.text_parser)
 
     def flow_from_h5(self, h5_group=None):
         """ Returns H5Iterator given a h5group from a HDF5 data
         """
-        return H5Iterator(h5_group, batch_size=self.batch_size, shuffle=self.shuffle, seed=self.seed, feature_extractor=self.feature_extractor, text_parser=self.text_parser)
+        return H5Iterator(h5_group, batch_size=self.batch_size,
+                          shuffle=self.shuffle, seed=self.seed,
+                          feature_extractor=self.feature_extractor,
+                          text_parser=self.text_parser)
 
     def flow_from_h5_file(self, h5_file, h5_group_name='/'):
         with h5py.File(h5_file, 'r') as f:
-            return H5Iterator(f[h5_group_name], batch_size=self.batch_size, shuffle=self.shuffle, seed=self.seed, feature_extractor=self.feature_extractor, text_parser=self.text_parser)
+            return H5Iterator(f[h5_group_name], batch_size=self.batch_size,
+                              shuffle=self.shuffle, seed=self.seed,
+                              feature_extractor=self.feature_extractor,
+                              text_parser=self.text_parser)
 
     def flow(self, inputs, labels):
-        return DatasetIterator(inputs, labels, batch_size=self.batch_size, shuffle=self.shuffle, seed=self.seed, feature_extractor=self.feature_extractor, text_parser=self.text_parser)
+        return DatasetIterator(inputs, labels, batch_size=self.batch_size,
+                               shuffle=self.shuffle, seed=self.seed,
+                               feature_extractor=self.feature_extractor,
+                               text_parser=self.text_parser)
+
 
 class DatasetIterator(Iterator):
 
-    def __init__(self, inputs, labels, batch_size=32, shuffle=False, seed=None, feature_extractor=None, text_parser=None):
-        """ DatasetIterator iterates in a batch over a dataset and do some preprocessing on inputs and labels
+    def __init__(self, inputs, labels, batch_size=32, shuffle=False,
+                 seed=None, feature_extractor=None, text_parser=None):
+        """ DatasetIterator iterates in a batch over a dataset and do some
+        preprocessing on inputs and labels
 
         # Arguments
             inputs: a list of ndarray
             labels: a list of str or ndarray
             batch_size: size of each batch
-            shuffle: if True after each epoch the dataset will shuffle the indexes
+            shuffle: if True after each epoch the dataset will shuffle the
+            indexes
             seed: seed the random generator
-            feature_extractor: instance of Feature [preprocessing.audio.Feature]
+            feature_extractor: instance of Feature
+            [preprocessing.audio.Feature]
                 feature that is applied to each ndarray in batch
             text_parser: instance of Parser [preprocessing.text.Parser].
                 parser that is applied to each label in batch
@@ -187,7 +215,8 @@ class DatasetIterator(Iterator):
         if labels is not None and len(inputs) != len(labels):
             raise ValueError('inputs and labels '
                              'should have the same length. '
-                             'Found: len(inputs) = %s, len(labels) = %s' % (len(inputs), len(labels)))
+                             'Found: len(inputs) = %s, len(labels) = %s' %
+                             (len(inputs), len(labels)))
 
         self.inputs = inputs
         self.labels = labels
@@ -195,7 +224,8 @@ class DatasetIterator(Iterator):
         self.feature_extractor = feature_extractor
         self.text_parser = text_parser
 
-        super(DatasetIterator, self).__init__(len(inputs), batch_size, shuffle, seed)
+        super(DatasetIterator, self).__init__(len(inputs), batch_size,
+                                              shuffle, seed)
 
     @property
     def len(self):
@@ -208,24 +238,31 @@ class DatasetIterator(Iterator):
 
         # Outputs
             Returns a tuple (input, output) that can be fed a CTC model
-                input: is a list containing the inputs, labels and sequence length for the current batch
-                output: is a list containing a vector of zeros (fake data for the decoder) and the batch labels for the decoder of a CTC model
+                input: is a list containing the inputs, labels and sequence
+                length for the current batch
+                output: is a list containing a vector of zeros (fake data for
+                the decoder) and the batch labels for the decoder of a CTC
+                model
         """
 
         # Copy from DirectoryIterator from keras
         with self.lock:
-            index_array, current_index, current_batch_size = next(self.index_generator)
+            index_array, current_index, current_batch_size = next(
+                self.index_generator)
 
         index_array.sort()
 
-        batch_inputs, batch_seq_len = self._make_in(self.inputs[index_array.tolist()], current_batch_size)
+        batch_inputs, batch_seq_len = self._make_in(
+            self.inputs[index_array.tolist()], current_batch_size)
 
-        batch_labels = self._make_out(self.labels[index_array.tolist()], current_batch_size)
+        batch_labels = self._make_out(self.labels[index_array.tolist()],
+                                      current_batch_size)
 
         return self._make_in_out(batch_inputs, batch_labels, batch_seq_len)
 
     def _make_in_out(self, batch_inputs, batch_labels, batch_seq_len=None):
-        return [batch_inputs, batch_labels, batch_seq_len], [np.zeros((batch_inputs.shape[0],)), batch_labels]
+        return ([batch_inputs, batch_labels, batch_seq_len],
+                [np.zeros((batch_inputs.shape[0],)), batch_labels])
 
     def _make_in(self, inputs, batch_size=None):
         if self.feature_extractor is not None:
@@ -248,6 +285,7 @@ class DatasetIterator(Iterator):
 
         return scipy.sparse.coo_matrix((data, (rows, cols)), dtype='int32')
 
+
 class H5Iterator(DatasetIterator):
 
     def __init__(self, h5group, **kwargs):
@@ -256,7 +294,7 @@ class H5Iterator(DatasetIterator):
         labels = h5group['labels']
 
         if kwargs.get('text_parser') is None:
-            raise ValueError, "text_parser must be set"
+            raise ValueError("text_parser must be set")
 
         self.num_feats = None
         if 'num_feats' in inputs.attrs.keys():
@@ -275,6 +313,7 @@ class H5Iterator(DatasetIterator):
 
         return super(H5Iterator, self)._make_in(inputs)
 
+
 class JSONIterator(DatasetIterator):
 
     def __init__(self, json_fname, dt_sel='train', **kwargs):
@@ -282,17 +321,17 @@ class JSONIterator(DatasetIterator):
         kwargs.setdefault('feature_extractor', audio.raw)
 
         if kwargs.get('feature_extractor') is None:
-            raise ValueError, "feature_extractor must be set"
+            raise ValueError("feature_extractor must be set")
 
         if kwargs.get('text_parser') is None:
-            raise ValueError, "text_parser must be set"
+            raise ValueError("text_parser must be set")
 
         with codecs.open(json_fname, 'r', encoding='utf8') as f:
             ld = json.load(f)
 
         data = utils.ld2dl(ld)
 
-        if data.has_key('dt'):
+        if 'dt' in data:
             inputs = np.array([d['audio'] for d in data if d['dt'] == dt_sel])
             labels = np.array([d['label'] for d in data if d['dt'] == dt_sel])
         else:
@@ -303,6 +342,7 @@ class JSONIterator(DatasetIterator):
 
         self.durations = np.array(data['duration'])
 
+
 class DictListIterator(DatasetIterator):
 
     def __init__(self, dict_list, dt_sel=None, **kwargs):
@@ -310,12 +350,12 @@ class DictListIterator(DatasetIterator):
         kwargs.setdefault('feature_extractor', audio.raw)
 
         if kwargs.get('feature_extractor') is None:
-            raise ValueError, "feature_extractor must be set"
+            raise ValueError("feature_extractor must be set")
 
         if kwargs.get('text_parser') is None:
-            raise ValueError, "text_parser must be set"
+            raise ValueError("text_parser must be set")
 
-        if dict_list.has_key('dt') and dt_sel is not None:
+        if 'dt' in dict_list and dt_sel is not None:
             dict_list = self._get_by_dt(dict_list, dt_sel)
 
         inputs = np.array(dict_list['audio'])
@@ -325,7 +365,6 @@ class DictListIterator(DatasetIterator):
 
         self.durations = np.array(dict_list['duration'])
 
-
     def _get_by_dt(self, dl, dt):
         mask = [i for i, d in enumerate(dl['dt']) if d == dt]
-        return {k: np.array(v)[mask] for k,v in dl.iteritems() if k != 'dt'}
+        return {k: np.array(v)[mask] for k, v in dl.iteritems() if k != 'dt'}

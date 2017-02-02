@@ -6,15 +6,21 @@ import re
 import librosa
 import codecs
 
+
 class HUE(DatasetParser):
     """ HUE dataset reader and parser
 
-    This dataset is a combination of four smaller datasets (voxforge, lapsbm, sidney, and cslu spoltech port). The dataset was divided in the following way:
+    This dataset is a combination of four smaller datasets (voxforge, lapsbm,
+    sidney, and cslu spoltech port). The dataset was divided in the following
+    way:
         * Train: voxforge, sidney, and cslu spoltech port
         * Valid: 5 women and 15 men from LaspBM
-        * Test: 5 women 10 men from LapsBM (without overlapping with valid set either in speaker and utterance spoken)
+        * Test: 5 women 10 men from LapsBM (without overlapping with valid set
+        either in speaker and utterance spoken)
 
-    After cleaning (removing label with zero length, label with numeric digits, e.g., 4 instead of four) the training set contains 11702 utterances with 425 speakers.
+    After cleaning (removing label with zero length, label with numeric
+    digits, e.g., 4 instead of four) the training set contains 11702
+    utterances with 425 speakers.
 
     """
 
@@ -29,11 +35,11 @@ class HUE(DatasetParser):
         value = super(dt_dir, self).dt_dir
 
         if not isinstance(value, dict):
-            raise ValueError, "dt_dir must be a dictionary"
+            raise ValueError("dt_dir must be a dictionary")
 
         for key in ('cslu', 'lapsbm', 'voxforge', 'sidney'):
-            if not value.has_key(key):
-                raise KeyError, "dt_dir must have the key %s" % key
+            if key not in value:
+                raise KeyError("dt_dir must have the key %s" % key)
 
         return self._dt_dir
 
@@ -63,6 +69,8 @@ class HUE(DatasetParser):
         report = '''General information:
            Number of utterances: %d
            Total size (in seconds) of utterances: %.f
-           Number of speakers: %d''' % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])))
+           Number of speakers: %d''' % (len(dl['audio']),
+                                        sum(dl['duration']),
+                                        len(set(dl['speaker'])))
 
         return report

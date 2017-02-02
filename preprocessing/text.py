@@ -8,6 +8,7 @@ import numpy as np
 PUNCTUATIONS = "'""-,.!?:;"
 ACCENTS = u'ãõçâêôáíóúàüóé'
 
+
 class BaseParser(object):
     """ Interface class for all parsers
     """
@@ -24,21 +25,25 @@ class BaseParser(object):
     def is_valid(self, _input):
         pass
 
+
 class CharParser(BaseParser):
     """ Class responsible to map any text in a certain character vocabulary
 
     # Arguments
-        mode: Which type of vacabulary will be generated. Modes can be concatenated by using pipeline '|'
-            'blank' or 'b': accepts space character
+        mode: Which type of vacabulary will be generated. Modes can be
+        concatenated by using pipeline '|'
+            'space' or 's': accepts space character
             'accents' or 'a': accepts pt-br accents
-            'punctuation' or 'p': accepts punctuation defined in string.punctuation
+            'punctuation' or 'p': accepts punctuation defined in
+            string.punctuation
             'digits': accepts all digits
-            'sensitive' or 's': characters will be case sensitive
+            'sensitive' or 'S': characters will be case sensitive
             'all': shortcut that enables all modes
     """
 
-    def __init__(self, mode='blank'):
-        self._permitted_modes = {'sensitive': 's', 'blank': 'b', 'accents': 'a', 'punctuation': 'p', 'digits': 'd'}
+    def __init__(self, mode='space'):
+        self._permitted_modes = {'sensitive': 'S', 'space': 's', 'accents':
+                                 'a', 'punctuation': 'p', 'digits': 'd'}
 
         if mode == 'all':
             self.mode = self._permitted_modes.values()
@@ -57,7 +62,8 @@ class CharParser(BaseParser):
 
     def map(self, txt, sanitize=True):
         if sanitize:
-            label = np.array([self._vocab[c] for c in self._sanitize(txt)], dtype='int32')
+            label = np.array([self._vocab[c] for c in self._sanitize(txt)],
+                             dtype='int32')
         else:
             label = np.array([self._vocab[c] for c in txt], dtype='int32')
 
@@ -79,12 +85,14 @@ class CharParser(BaseParser):
             text = unidecode(text)
 
         if not('p' in self.mode):
-            text = text.translate(string.maketrans("-'", '  ')).translate(None, string.punctuation)
+            text = text.translate(
+                string.maketrans("-'", '  ')).translate(None,
+                                                        string.punctuation)
 
-        if not ('b' in self.mode):
+        if not ('s' in self.mode):
             text = text.replace(' ', '')
 
-        if not('s' in self.mode):
+        if not('S' in self.mode):
             text = text.lower()
 
         return text
@@ -99,17 +107,18 @@ class CharParser(BaseParser):
 
     def _gen_vocab(self):
 
-        vocab = {chr(value + ord('a')): (value) for value in xrange(ord('z') - ord('a') + 1)}
+        vocab = {chr(value + ord('a')): (value)
+                 for value in xrange(ord('z') - ord('a') + 1)}
 
         if 'a' in self.mode:
             for a in ACCENTS:
                 vocab[a] = len(vocab)
 
-        if 's' in self.mode:
+        if 'S' in self.mode:
             for char in vocab.keys():
                 vocab[char.upper()] = len(vocab)
 
-        if 'b' in self.mode:
+        if 's' in self.mode:
             # Inserts space label
             vocab[' '] = len(vocab)
 
@@ -119,7 +128,7 @@ class CharParser(BaseParser):
 
         if 'd' in self.mode:
             for num in range(10):
-                vocab[str(num)]  = len(vocab)
+                vocab[str(num)] = len(vocab)
 
         inv_vocab = {v: k for (k, v) in vocab.iteritems()}
 
@@ -128,5 +137,10 @@ class CharParser(BaseParser):
 
         return vocab, inv_vocab
 
-simple_char_parser = lambda txt: CharParser().map(txt)
-complex_char_parser = lambda txt: CharParser(mode='b|p|a|d').map(txt)
+
+def simple_char_parser(txt):
+    return CharParser().map(txt)
+
+
+def complex_char_parser(txt):
+    CharParser(mode='s|p|a|d').map(txt)

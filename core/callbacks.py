@@ -1,11 +1,12 @@
 from keras.callbacks import Callback
 import yaml
 
+
 class MetaCheckpoint(Callback):
     """
     Checkpoints some training information on a meta file. Together with the
-    Keras model saving, this should enable resuming training and having training
-    information on every checkpoint.
+    Keras model saving, this should enable resuming training and having
+    training information on every checkpoint.
 
     Thanks to Roberto Estevao @robertomest - robertomest@poli.ufrj.br
     """
