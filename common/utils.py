@@ -16,8 +16,12 @@ import tensorflow as tf
 import keras
 
 import inspect
+import yaml
 
 import core
+
+
+from .hparams import HParams
 
 
 def safe_mkdirs(path):
@@ -73,11 +77,22 @@ def get_custom_objects():
     return dict(all_custom_objects)
 
 
-def load_model(model_fname):
+def load_model(model_fname, return_meta=False):
     """ Loading keras model with custom objects
     """
     model = keras.models.load_model(model_fname,
                                     custom_objects=get_custom_objects())
+
+    if return_meta:
+        meta = {}
+        with h5py.File(model_fname, 'r') as f:
+            meta_group = f['meta']
+
+            meta['training_args'] = yaml.load(
+                meta_group.attrs['training_args'])
+            for k in meta_group.keys():
+                meta[k] = list(meta_group[k])
+        return model, meta
     return model
 
 
@@ -102,3 +117,16 @@ def config_gpu(gpu, allow_growth=False):
         config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
     K.set_session(session)
+
+
+def parse_nondefault_args(args, default_args):
+    # removing default arguments
+    args_default = {k: v for k, v in vars(default_args).items()
+                    if k not in [arg.split('-')[-1] for arg in sys.argv
+                                 if arg.startswith('-')]}
+    args_nondefault = {k: v for k, v in vars(args).items()
+                       if k not in args_default or args_default[k] != v}
+
+    args_nondefault = HParams(from_str=str(args_nondefault))
+
+    return args_nondefault
