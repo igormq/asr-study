@@ -45,9 +45,9 @@ class HUE(DatasetParser):
 
     def _iter(self):
 
-        for dataset in (CSLU(self.dt_dir['cslu']),
-                        VoxForge(self.dt_dir['voxforge']),
-                        Sidney(self.dt_dir['sidney'])):
+        for dataset in (CSLU(dt_dir=self.dt_dir['cslu']),
+                        VoxForge(dt_dir=self.dt_dir['voxforge']),
+                        Sidney(dt_dir=self.dt_dir['sidney'])):
 
             for d in dataset._iter():
                 yield {'duration': d['duration'],
@@ -57,7 +57,7 @@ class HUE(DatasetParser):
                        'dt': 'train'}
 
         # Test and valid set
-        lapsbm = LapsBM(self.dt_dir['lapsbm'], split=True)
+        lapsbm = LapsBM(dt_dir=self.dt_dir['lapsbm'], split=True)
         for d in lapsbm._iter():
             yield {'duration': d['duration'],
                    'audio': d['audio'],

@@ -94,6 +94,6 @@ class LapsBM(DatasetParser):
            %% of female speaker: %.2f%%''' \
            % (len(dl['audio']), sum(dl['duration']), len(set(dl['speaker'])),
               100 * (sum([1 for g in dl['gender'] if g == 'f']) /
-                     (1.0 * len(dl['gender']))))
+                        (1.0 * len(dl['gender']))))
 
         return report
