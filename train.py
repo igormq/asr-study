@@ -6,6 +6,11 @@ import os
 # Preventing pool_allocator message
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+try:
+    import warpctc_tensorflow
+except ImportError:
+    print('warpctc binding for tensorflow not found. :(')
+
 import tensorflow as tf
 import codecs
 
@@ -85,6 +90,7 @@ if __name__ == '__main__':
     parser.add_argument('--save', default=None, type=str)
     parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--allow_growth', default=False, action='store_true')
+    parser.add_argument('--verbose', default=0, type=int)
 
     args = parser.parse_args()
 
@@ -93,7 +99,8 @@ if __name__ == '__main__':
         show_metrics=['loss', 'decoder_ler', 'val_loss', 'val_decoder_ler'])
 
     # GPU configuration
-    utils.config_gpu(args.gpu, args.allow_growth)
+    utils.config_gpu(args.gpu, args.allow_growth,
+                     log_device_placement=args.verbose > 1)
 
     # Initial configuration
     epoch_offset = 0

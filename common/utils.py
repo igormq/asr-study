@@ -104,14 +104,15 @@ def ld2dl(ld):
     return dict(zip(ld[0], zip(*[d.values() for d in ld])))
 
 
-def config_gpu(gpu, allow_growth=False):
+def config_gpu(gpu, allow_growth=False, log_device_placement=False):
     # Choosing gpu
     if gpu == '-1':
-        config = tf.ConfigProto(device_count={'GPU': 0})
+        config = tf.ConfigProto(device_count={'GPU': 0},
+                                log_device_placement=log_device_placement)
     else:
         if gpu == 'all':
             gpu = ''
-        config = tf.ConfigProto()
+        config = tf.ConfigProto(log_device_placement=log_device_placement)
         config.gpu_options.visible_device_list = gpu
     if allow_growth:  # dynamic gpu memory allocation
         config.gpu_options.allow_growth = True
