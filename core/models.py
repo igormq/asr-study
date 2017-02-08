@@ -22,6 +22,8 @@ from keras.layers import Dropout
 
 from keras.regularizers import l1, l2, l1l2
 
+from .layers_utils import recurrent
+
 
 def ctc_model(input_, output, **kwargs):
     """ Given the input and output returns a model appending ctc_loss and the
@@ -110,6 +112,56 @@ def bayesian_lstm(hparams):
                           dropout_W=params.dropout,
                           dropout_U=params.dropout,
                           consume_less='gpu'))(o)
+
+    o = TimeDistributed(Dense(params.nb_classes,
+                              W_regularizer=l2(params.weight_decay)))(o)
+
+    return ctc_model(x, o)
+
+
+def zoneout_rnn(hparams):
+    """ LSTM/GRU with variational dropout, weight decay and zoneout. Following the
+    best topology of [2] (without a transducer).
+    Note:
+        Dropout, zoneout and weight decay is tied through layers, minimizing
+        the number of hyper parameters
+    Reference:
+        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in
+        Recurrent Neural Networks", 2015.
+        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech
+        recognition with deep recurrent neural networks", 2013.
+        [3] Krueger, David, et al. "Zoneout: Regularizing rnns by randomly
+        preserving hidden activations", 2016.
+    """
+    params = HParams(nb_features=39,
+                     nb_classes=28,
+                     nb_hidden=256,
+                     nb_layers=3,
+                     dropout=0.,
+                     zoneout=0.2,
+                     input_dropout=False,
+                     input_std_noise=.0,
+                     weight_decay=1e-4,
+                     model='lstm')
+
+    params.parse(hparams)
+
+    x = Input(name='input', shape=(None, params.nb_features))
+    o = x
+
+    if params.input_std_noise is not None:
+        o = GaussianNoise(params.input_std_noise)(o)
+
+    if params.input_dropout:
+        o = Dropout(params.dropout)(o)
+
+    for _ in range(params.nb_layers):
+        o = Bidirectional(recurrent(params.nb_hidden,
+                                    model=params.model,
+                                    return_sequences=True,
+                                    regularizer=l2(params.weight_decay),
+                                    dropout=params.dropout,
+                                    zoneout=params.zoneout))(o)
 
     o = TimeDistributed(Dense(params.nb_classes,
                               W_regularizer=l2(params.weight_decay)))(o)
