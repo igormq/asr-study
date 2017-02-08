@@ -11,6 +11,8 @@ import codecs
 import json
 import os
 
+import time
+
 from preprocessing import audio, text
 
 from . import utils
@@ -252,10 +254,12 @@ class DatasetIterator(Iterator):
 
         index_array.sort()
 
-        batch_inputs, batch_seq_len = self._make_in(
-            self.inputs[index_array.tolist()], current_batch_size)
+        index_array_list = index_array.tolist()
 
-        batch_labels = self._make_out(self.labels[index_array.tolist()],
+        batch_inputs, batch_seq_len = self._make_in(
+            self.inputs[index_array_list], current_batch_size)
+
+        batch_labels = self._make_out(self.labels[index_array_list],
                                       current_batch_size)
 
         return self._make_in_out(batch_inputs, batch_labels, batch_seq_len)
@@ -308,6 +312,7 @@ class H5Iterator(DatasetIterator):
         super(H5Iterator, self).__init__(inputs, labels, **kwargs)
 
     def _make_in(self, inputs, batch_size=None):
+
         if self.num_feats is not None:
             inputs = [i.reshape((-1, self.num_feats)) for i in inputs]
 
