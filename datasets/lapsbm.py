@@ -67,7 +67,7 @@ class LapsBM(DatasetParser):
                     continue
 
                 if not self._is_valid_label(label):
-                    self.logger.error(u'File %s has a forbidden label: "%s". \
+                    self._logger.error(u'File %s has a forbidden label: "%s". \
                                       Skipping' % (audio_file, label))
                     continue
 

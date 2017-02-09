@@ -31,12 +31,12 @@ class DatasetParser(object):
 
         self.has_json = False
         if os.path.isfile(self.json_fname):
-            self.logger.debug('has_json = True')
+            self._logger.debug('has_json = True')
             self.has_json = True
 
         self.has_h5 = False
         if os.path.isfile(self.h5_fname):
-                self.logger.debug('has_h5 = True')
+                self._logger.debug('has_h5 = True')
                 self.has_h5 = True
 
         if not os.path.isdir(self.output_dir):
@@ -106,7 +106,7 @@ class DatasetParser(object):
                                   override the current file you must set the \
                                   parameter `override` to `True`")
 
-        self.logger.info('Opening %s', self.h5_fname)
+        self._logger.info('Opening %s', self.h5_fname)
         with h5py.File(self.h5_fname) as f:
 
             # If the key already exists
@@ -131,7 +131,7 @@ class DatasetParser(object):
                 durations = feat_group.create_dataset(
                     'durations', (0,), maxshape=(None,))
 
-            self.logger.debug('Creating %s group in hdf5 file', feat_name)
+            self._logger.debug('Creating %s group in hdf5 file', feat_name)
             feat_group = f.create_group(feat_name)
 
             if 'dt' in ld[0]:
@@ -165,11 +165,11 @@ class DatasetParser(object):
 
                 # Flush to disk only when it reaches 128 samples
                 if index % 128 == 0:
-                    self.logger.info('%d/%d done.' % (index, len(ld)))
+                    self._logger.info('%d/%d done.' % (index, len(ld)))
                     f.flush()
 
             f.flush()
-            self.logger.info('%d/%d done.' % (len(ld), len(ld)))
+            self._logger.info('%d/%d done.' % (len(ld), len(ld)))
 
     def read(self, method=None):
         ''' Read dataset from disk (either json file or from directory) and
