@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 
 import string
 from unidecode import unidecode
+import logging
 import numpy as np
 
 PUNCTUATIONS = "'""-,.!?:;"
@@ -14,7 +15,8 @@ class BaseParser(object):
     """
 
     def __init__(self):
-        pass
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
 
     def map(self, _input):
         pass

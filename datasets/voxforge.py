@@ -76,11 +76,12 @@ class VoxForge(DatasetParser):
                 try:
                     duration = librosa.audio.get_duration(filename=audio_file)
                 except IOError:
-                    print('File %s not found' % audio_file)
+                    self._logger.error('File %s not found' % audio_file)
                     continue
 
                 if not self._is_valid_label(label):
-                    print(u'File %s has a forbidden label: "%s". Skipping'
+                    self._logger.error(u'File %s has a forbidden label: "%s". \
+                                      Skipping'
                           % (audio_file, label))
                     continue
 

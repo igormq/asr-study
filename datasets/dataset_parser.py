@@ -11,6 +11,8 @@ from common.utils import ld2dl
 from preprocessing import audio, text
 from common.utils import safe_mkdirs
 
+import logging
+
 
 class DatasetParser(object):
     '''Read data from directory and parser in a proper format
@@ -18,6 +20,8 @@ class DatasetParser(object):
 
     def __init__(self, dt_dir=None, name=None,
                  text_parser=text.CharParser('s|S|a|p')):
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
         self.dt_dir = dt_dir
         self._name = name
         self.output_dir = os.path.join(DT_ABSPATH, self.name)
@@ -27,10 +31,12 @@ class DatasetParser(object):
 
         self.has_json = False
         if os.path.isfile(self.json_fname):
+            self.logger.debug('has_json = True')
             self.has_json = True
 
         self.has_h5 = False
         if os.path.isfile(self.h5_fname):
+                self.logger.debug('has_h5 = True')
                 self.has_h5 = True
 
         if not os.path.isdir(self.output_dir):
@@ -79,6 +85,7 @@ class DatasetParser(object):
 
         report = self._report(ld2dl(data))
         with open(report_fname, 'w') as f:
+            logger.info(report)
             f.write(report + '\n')
 
     def to_h5(self, feat_map=audio.raw, override=False):
@@ -99,6 +106,7 @@ class DatasetParser(object):
                                   override the current file you must set the \
                                   parameter `override` to `True`")
 
+        self.logger.info('Opening %s', self.h5_fname)
         with h5py.File(self.h5_fname) as f:
 
             # If the key already exists
@@ -123,6 +131,7 @@ class DatasetParser(object):
                 durations = feat_group.create_dataset(
                     'durations', (0,), maxshape=(None,))
 
+            self.logger.debug('Creating %s group in hdf5 file', feat_name)
             feat_group = f.create_group(feat_name)
 
             if 'dt' in ld[0]:
@@ -156,11 +165,11 @@ class DatasetParser(object):
 
                 # Flush to disk only when it reaches 128 samples
                 if index % 128 == 0:
-                    print('%d/%d done.' % (index, len(ld)))
+                    self.logger.info('%d/%d done.' % (index, len(ld)))
                     f.flush()
 
             f.flush()
-            print('%d/%d done.' % (len(ld), len(ld)))
+            self.logger.info('%d/%d done.' % (len(ld), len(ld)))
 
     def read(self, method=None):
         ''' Read dataset from disk (either json file or from directory) and

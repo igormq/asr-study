@@ -9,7 +9,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 try:
     import warpctc_tensorflow
 except ImportError:
-    print('warpctc binding for tensorflow not found. :(')
+    logging.warning('warpctc binding for tensorflow not found. :(')
 
 import tensorflow as tf
 import codecs
@@ -28,7 +28,6 @@ from core.callbacks import MetaCheckpoint, ProgbarLogger
 
 from preprocessing import audio, text
 
-import common.utils as utils
 from common.dataset_generator import DatasetGenerator
 from common.hparams import HParams
 
@@ -39,9 +38,11 @@ import json
 import datetime
 import inspect
 
-tf.logging.set_verbosity(tf.logging.ERROR)
+import logging
+import common.utils as utils
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description='Training an ASR system.')
 
     # Resume training
@@ -94,7 +95,12 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # hack in ProgbarLogger: avoid printing the dummy losses
+    # Setup logging
+    utils.setup_logging()
+    logger = logging.getLogger(__name__)
+    tf.logging.set_verbosity(tf.logging.ERROR)
+
+    # hack in ProgbarLogger: avoid logger.infoing the dummy losses
     keras.callbacks.ProgbarLogger = lambda: ProgbarLogger(
         show_metrics=['loss', 'decoder_ler', 'val_loss', 'val_decoder_ler'])
 
@@ -110,28 +116,28 @@ if __name__ == '__main__':
         args_nondefault = utils.parse_nondefault_args(args,
                                                       parser.parse_args([]))
 
-        print('Loading model...')
+        logger.info('Loading model...')
         model, meta = utils.load_model(args.load, return_meta=True)
 
-        print('Loading parameters...')
+        logger.info('Loading parameters...')
         args = HParams(
             from_str=str(meta['training_args'])).update(vars(args_nondefault))
 
         epoch_offset = len(meta['epochs'])
-        print('Current epoch: %d' % epoch_offset)
+        logger.info('Current epoch: %d' % epoch_offset)
 
         if args_nondefault.lr:
-            print('Setting current learning rate to %f...' % args.lr)
+            logger.info('Setting current learning rate to %f...' % args.lr)
             K.set_value(model.optimizer.lr, args.lr)
 
     else:
-        print('Creating model...')
+        logger.info('Creating model...')
         # Recovering all valid models
         model_fn = utils.get_from_module('core.models', args.model)
         # Loading model
         model = model_fn(args.model_params)
 
-        print('Setting the optimizer...')
+        logger.info('Setting the optimizer...')
         # Optimization
         if args.opt == 'sgd':
             opt = SGD(lr=args.lr, momentum=args.momentum,
@@ -145,7 +151,7 @@ if __name__ == '__main__':
                       optimizer=opt, metrics={'decoder': metrics.ler},
                       loss_weights=[1, 0])
 
-    print('Creating results folder...')
+    logger.info('Creating results folder...')
     # Creating the results folder
     name = args.save
     if name is None:
@@ -154,7 +160,7 @@ if __name__ == '__main__':
     if not os.path.isdir(name):
         os.makedirs(name)
 
-    print('Adding callbacks')
+    logger.info('Adding callbacks')
     # Callbacks
     model_ckpt = MetaCheckpoint(os.path.join(name, 'model.h5'),
                                 training_args=args, meta=meta)
@@ -172,28 +178,28 @@ if __name__ == '__main__':
                 *HParams(from_str=args.lr_params).values())
             callback_list.append(lr_schedule)
 
-    print('Getting the feature extractor...')
+    logger.info('Getting the feature extractor...')
     # Features extractor
     feats_extractor = utils.get_from_module('preprocessing.audio', args.feats)
     if feats_extractor and not inspect.isfunction(feats_extractor):
         feats_extractor = feats_extractor(
             *HParams(from_str=args.feats_params).values())
 
-    print('Getting the text parser...')
+    logger.info('Getting the text parser...')
     # Recovering text parser
     text_parser = utils.get_from_module('preprocessing.text', args.text_parser)
     if text_parser and not inspect.isfunction(text_parser):
         text_parser = text_parser(
             *HParams(from_str=(args.text_parser_params)).values())
 
-    print('Getting the data generator...')
+    logger.info('Getting the data generator...')
     # Data generator
     data_gen = DatasetGenerator(feats_extractor, text_parser,
                                 batch_size=args.batch_size, seed=0)
     # iterators over datasets
     train_flow, valid_flow, test_flow = None, None, None
 
-    print('Generating flow...')
+    logger.info('Generating flow...')
     if args.dataset is not None:
         train_flow, valid_flow, test_flow = data_gen.flows_from_fname(
             args.dataset)
@@ -211,7 +217,7 @@ if __name__ == '__main__':
     if valid_flow:
         nb_val_samples = valid_flow.len
 
-    print('Initialzing training...')
+    logger.info('Initialzing training...')
     # Fit the model
     model.fit_generator(train_flow, samples_per_epoch=train_flow.len,
                         nb_epoch=args.nb_epoch, validation_data=valid_flow,
@@ -220,13 +226,15 @@ if __name__ == '__main__':
                         initial_epoch=epoch_offset)
 
     if test_flow:
-        print('Evaluating model on test set')
+        del model
+        model = utils.load_model(os.path.join(name, 'best.h5'))
+        logger.info('Evaluating best model on test set')
         metrics = model.evaluate_generator(test_flow, test_flow.len,
                                            max_q_size=10, nb_worker=1)
 
         msg = 'Total loss: %.4f\n\
 CTC Loss: %.4f\nLER: %.2f' % (metrics[0], metrics[1], metrics[3])
-        print(msg)
+        logger.info(msg)
 
         with open(os.path.join(name, 'results.txt'), 'w') as f:
             f.write(msg)

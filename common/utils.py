@@ -6,6 +6,10 @@ import h5py
 import sys
 import os
 
+import logging
+import logging.config
+import yaml
+
 import numpy as np
 from scipy import sparse
 
@@ -22,6 +26,9 @@ import core
 
 
 from .hparams import HParams
+
+
+logger = logging.getLogger(__name__)
 
 
 def safe_mkdirs(path):
@@ -77,6 +84,19 @@ def get_custom_objects():
     return dict(all_custom_objects)
 
 
+def load_meta(model_fname):
+    meta = {}
+    with h5py.File(model_fname, 'r') as f:
+        meta_group = f['meta']
+
+        meta['training_args'] = yaml.load(
+            meta_group.attrs['training_args'])
+        for k in meta_group.keys():
+            meta[k] = list(meta_group[k])
+
+    return meta
+
+
 def load_model(model_fname, return_meta=False):
     """ Loading keras model with custom objects
     """
@@ -84,15 +104,9 @@ def load_model(model_fname, return_meta=False):
                                     custom_objects=get_custom_objects())
 
     if return_meta:
-        meta = {}
-        with h5py.File(model_fname, 'r') as f:
-            meta_group = f['meta']
-
-            meta['training_args'] = yaml.load(
-                meta_group.attrs['training_args'])
-            for k in meta_group.keys():
-                meta[k] = list(meta_group[k])
+        meta = load_meta(model_fname)
         return model, meta
+
     return model
 
 
@@ -131,3 +145,20 @@ def parse_nondefault_args(args, default_args):
     args_nondefault = HParams(from_str=str(args_nondefault))
 
     return args_nondefault
+
+
+def setup_logging(default_path='logging.yaml', default_level=logging.INFO,
+                  env_key='LOG_CFG'):
+    """Setup logging configuration
+
+    """
+    path = default_path
+    value = os.getenv(env_key, None)
+    if value:
+        path = value
+    if os.path.exists(path):
+        with open(path, 'rt') as f:
+            config = yaml.safe_load(f.read())
+        logging.config.dictConfig(config)
+    else:
+        logging.basicConfig(level=default_level)

@@ -45,7 +45,8 @@ class Sidney(DatasetParser):
             try:
                 age = int(info['age'])
             except ValueError:
-                print('age %s could not be converted in int.' % (info['age']))
+                self.logger.error('age %s could not be converted in int.',
+                                  (info['age']))
                 age = 0
 
             for line in codecs.open(labels_file, 'r', encoding='utf8'):
@@ -61,12 +62,12 @@ class Sidney(DatasetParser):
                 try:
                     duration = librosa.audio.get_duration(filename=audio_file)
                 except IOError:
-                    print('File %s not found' % audio_file)
+                    self.logger.error('File %s not found' % audio_file)
                     continue
 
                 if not self._is_valid_label(label):
-                    print(u'File %s has a forbidden label: "%s". Skipping'
-                          % (audio_file, label))
+                    self.logger.error(u'File %s has a forbidden label: "%s". \
+                                      Skipping', audio_file, label)
                     continue
 
                 yield {'duration': duration,

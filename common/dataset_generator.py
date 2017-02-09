@@ -17,6 +17,8 @@ from preprocessing import audio, text
 
 from . import utils
 
+import logging
+
 
 class DatasetGenerator(object):
     """ Dataset generator that handles several forms of input and return an
@@ -34,6 +36,8 @@ class DatasetGenerator(object):
 
     def __init__(self, feature_extractor=None, text_parser=None, batch_size=32,
                  shuffle=True, seed=None):
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
         self.feature_extractor = feature_extractor
         self.text_parser = text_parser
         self.batch_size = batch_size
@@ -117,16 +121,21 @@ class DatasetGenerator(object):
                 feat_group = h5_f[str(self.feature_extractor)]
                 # it's not necessary, feature already exists
                 self.feature_extractor = None
+            else:
+                self._logger.warning('Feature not found in hdf5 file. Calculating in real time. This might slow down training.')
 
             if 'train' in feat_group.keys():
                 train_iter = self.flow_from_h5(feat_group['train'])
             else:
+                self._logger.warning('Train group not found. Using root key')
                 train_iter = self.flow_from_h5(feat_group)
 
             if 'valid' in feat_group.keys():
+                self._logger.info('Valid group found.')
                 valid_iter = self.flow_from_h5(feat_group['valid'])
 
             if 'test' in feat_group.keys():
+                self._logger.info('Test group found.')
                 test_iter = self.flow_from_h5(feat_group['test'])
 
             return train_iter, valid_iter, test_iter
@@ -141,14 +150,18 @@ class DatasetGenerator(object):
             if 'dt' in data:
                 dts = set(data['dt'])
                 if 'train' in dts:
+                    self._logger.info('Train group found.')
                     train_iter = self.flow_from_dl(data, 'train')
 
                 if 'valid' in dts:
+                    self._logger.info('Valid group found.')
                     valid_iter = self.flow_from_dl(data, 'valid')
 
                 if 'test' in dts:
+                    self._logger.info('Test group found.')
                     test_iter = self.flow_from_dl(data, 'test')
             else:
+                self._logger.info('Using all data as training set.')
                 train_iter = self.flow_from_dl(data, None)
 
             return train_iter, valid_iter, test_iter
@@ -219,7 +232,8 @@ class DatasetIterator(Iterator):
                              'should have the same length. '
                              'Found: len(inputs) = %s, len(labels) = %s' %
                              (len(inputs), len(labels)))
-
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
         self.inputs = inputs
         self.labels = labels
 
