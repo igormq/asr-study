@@ -181,7 +181,7 @@ if __name__ == '__main__':
     logger.info('Getting the feature extractor...')
     # Features extractor
     feats_extractor = utils.get_from_module('preprocessing.audio',
-                                            args.feats
+                                            args.feats,
                                             args.feats_params)
 
     logger.info('Getting the text parser...')
