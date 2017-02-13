@@ -18,6 +18,9 @@ class BaseParser(object):
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
 
+    def __call__(self, _input):
+        return self.map(_input)
+
     def map(self, _input):
         pass
 
@@ -140,9 +143,5 @@ class CharParser(BaseParser):
         return vocab, inv_vocab
 
 
-def simple_char_parser(txt):
-    return CharParser().map(txt)
-
-
-def complex_char_parser(txt):
-    CharParser(mode='s|p|a|d').map(txt)
+simple_char_parser = CharParser()
+complex_char_parser = CharParser(mode='s|p|a|d')
