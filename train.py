@@ -180,17 +180,15 @@ if __name__ == '__main__':
 
     logger.info('Getting the feature extractor...')
     # Features extractor
-    feats_extractor = utils.get_from_module('preprocessing.audio', args.feats)
-    if feats_extractor and not inspect.isfunction(feats_extractor):
-        feats_extractor = feats_extractor(
-            *HParams(from_str=args.feats_params).values())
+    feats_extractor = utils.get_from_module('preprocessing.audio',
+                                            args.feats
+                                            args.feats_params)
 
     logger.info('Getting the text parser...')
     # Recovering text parser
-    text_parser = utils.get_from_module('preprocessing.text', args.text_parser)
-    if text_parser and not inspect.isfunction(text_parser):
-        text_parser = text_parser(
-            *HParams(from_str=(args.text_parser_params)).values())
+    text_parser = utils.get_from_module('preprocessing.text',
+                                        args.text_parser,
+                                        args.text_parser_params)
 
     logger.info('Getting the data generator...')
     # Data generator

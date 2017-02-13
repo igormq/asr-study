@@ -37,29 +37,28 @@ if __name__ == '__main__':
     parser.add_argument('--allow_growth', default=False, action='store_true')
 
     args = parser.parse_args()
-    args_nondefault = utils.parse_nondefault_args(args,
-                                                  parser.parse_args(['--model', args.model, '--dataset', args.dataset]))
+    args_nondefault = utils.parse_nondefault_args(
+        args, parser.parse_args(
+            ['--model', args.model, '--dataset', args.dataset]))
 
     # GPU configuration
     utils.config_gpu(args.gpu, args.allow_growth)
 
     # Loading model
-    model, meta = utils.load_model(args.model, return_meta=True)
+    model, meta = utils.load_model(args.model, return_meta=True, mode='eval')
 
     args = HParams(
         from_str=str(meta['training_args'])).update(vars(args_nondefault))
 
     # Features extractor
-    feats_extractor = utils.get_from_module('preprocessing.audio', args.feats)
-    if feats_extractor and not inspect.isfunction(feats_extractor):
-        feats_extractor = feats_extractor(
-            *HParams(from_str=args.feats_params).values())
+    feats_extractor = utils.get_from_module('preprocessing.audio',
+                                            args.feats,
+                                            args.feats_params)
 
     # Recovering text parser
-    text_parser = utils.get_from_module('preprocessing.text', args.text_parser)
-    if text_parser and not inspect.isfunction(text_parser):
-        text_parser = text_parser(
-            *HParams(from_str=(args.text_parser_params)).values())
+    text_parser = utils.get_from_module('preprocessing.text',
+                                        args.text_parser,
+                                        args.text_parser_params)
 
     data_gen = DatasetGenerator(feats_extractor, text_parser,
                                 batch_size=args.batch_size, seed=0)
