@@ -208,7 +208,7 @@ class DatasetGenerator(object):
 
 class DatasetIterator(Iterator):
 
-    def __init__(self, inputs, labels, batch_size=32, shuffle=False,
+    def __init__(self, inputs, labels=None, batch_size=32, shuffle=False,
                  seed=None, feature_extractor=None, text_parser=None):
         """ DatasetIterator iterates in a batch over a dataset and do some
         preprocessing on inputs and labels
@@ -273,12 +273,19 @@ class DatasetIterator(Iterator):
         batch_inputs, batch_seq_len = self._make_in(
             self.inputs[index_array_list], current_batch_size)
 
-        batch_labels = self._make_out(self.labels[index_array_list],
-                                      current_batch_size)
+        if self.labels is not None:
+            batch_labels = self._make_out(self.labels[index_array_list],
+                                          current_batch_size)
+        else:
+            batch_labels = None
 
         return self._make_in_out(batch_inputs, batch_labels, batch_seq_len)
 
     def _make_in_out(self, batch_inputs, batch_labels, batch_seq_len=None):
+        # if label is not provided output is not necessary
+        if batch_labels is None:
+            return [batch_inputs, batch_seq_len]
+
         return ([batch_inputs, batch_labels, batch_seq_len],
                 [np.zeros((batch_inputs.shape[0],)), batch_labels])
 
@@ -291,6 +298,9 @@ class DatasetIterator(Iterator):
         return batch_inputs, batch_seq_len
 
     def _make_out(self, labels, batch_size=None):
+        if self.labels is None:
+            return None
+
         if self.text_parser is not None:
             labels = [self.text_parser(l) for l in labels]
 
