@@ -175,7 +175,7 @@ if __name__ == '__main__':
                                                args.lr_schedule)
         if lr_schedule_fn:
             lr_schedule = lr_schedule_fn(
-                *HParams(from_str=args.lr_params).values())
+                **HParams(from_str=args.lr_params).values())
             callback_list.append(lr_schedule)
 
     logger.info('Getting the feature extractor...')

@@ -66,10 +66,10 @@ def get_from_module(module, name, params=None):
         if (member and params) and inspect.isclass(member):
             if type(params) is str:
                 return member(
-                    *HParams(from_str=params).values())
+                    **HParams(from_str=params).values())
 
-            if type(params) in (list, dict):
-                return member(*HParams(*params).values())
+            if type(params) in (dict):
+                return member(**HParams(**params).values())
 
             raise ValueError("params was not recognized.")
 
@@ -230,3 +230,14 @@ def setup_logging(default_path='logging.yaml', default_level=logging.INFO,
         logging.config.dictConfig(config)
     else:
         logging.basicConfig(level=default_level)
+
+
+def check_ext(fname, ext):
+    # Adding dot
+    ext = ext if ext[0] == '.' else '.' + ext
+    fname, f_ext = os.path.splitext(fname)
+
+    if f_ext == ext:
+        return True
+
+    return False
