@@ -12,6 +12,7 @@ import numpy as np
 import speech_recognition as sr
 
 import common.utils as utils
+import common.apis as apis
 from common.dataset_generator import DatasetIterator
 
 import keras.backend as K
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--allow_growth', default=False, action='store_true')
 
-    parser.add_argument('--offline', action='store_true', default=False)
+    parser.add_argument('--apis', default=['google', 'ibm', 'microsoft'], nargs='+')
 
     args = parser.parse_args()
 
@@ -83,48 +84,19 @@ if __name__ == "__main__":
 
     for i, (audio, name) in enumerate(audios):
 
-        if not args.offline:
-            print('Recognizing from: %s' % name)
+        print('Recognizing from: %s' % name)
 
-            # recognize speech using Google Cloud Speech
-            try:
-                rec = r.recognize_google_cloud(
-                    audio,
-                    credentials_json=os.environ['GOOGLE_CLOUD_API'],
-                    language=args.language)
-                print("\tGoogle Cloud Speech:\n\t\t'%s'" % rec)
-            except sr.UnknownValueError:
-                print("\tGoogle Cloud Speech could not understand audio")
-            except sr.RequestError as e:
-                print("\tCould not request results from Google Cloud Speech \
-service; {0}".format(e))
+        if 'google' in args.apis:
+            rec = apis.recognize_google(audio, language=args.language)
+            print("\tGoogle Cloud Speech:\n\t\t'%s'" % rec)
 
-            # recognize speech using Microsoft Bing
-            try:
-                rec = r.recognize_bing(
-                    audio,
-                    key=os.environ['BING_API'],
-                    language=args.language)
-                print("\tMicrosoft Bing:\n\t\t'%s'" % rec)
-            except sr.UnknownValueError:
-                print("\tMicrosoft Bing could not understand audio")
-            except sr.RequestError as e:
-                print("\tCould not request results from Microsoft Bing Voice \
-Recognition service; {0}".format(e))
+        if 'microsoft' in args.apis:
+            rec = apis.recognize_bing(audio, language=args.language)
+            print("\tMicrosoft Bing:\n\t\t'%s'" % rec)
 
-            # recognize speech using IBM Speech to Text
-            try:
-                rec = r.recognize_ibm(
-                    audio,
-                    username=os.environ['IBM_USERNAME'],
-                    password=os.environ['IBM_PASSWORD'],
-                    language=args.language)
-                print("\tIBM Speech to Text:\n\t\t'%s'" % rec)
-            except sr.UnknownValueError:
-                print("\tIBM Speech to Text could not understand audio")
-            except sr.RequestError as e:
-                print("\tCould not request results from IBM Speech to Text \
-service; {0}".format(e))
+        if 'ibm' in args.apis:
+            rec = apis.recognize_ibm(audio, language=args.language)
+            print("\tIBM Speech to Text:\n\t\t'%s'" % rec)
 
         if args.model is not None:
             print("\tTrained model:\n\t\t'%s'" % model_predictions[i])
