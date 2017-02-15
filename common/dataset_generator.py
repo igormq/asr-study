@@ -76,7 +76,7 @@ class DatasetGenerator(object):
             if (self.feature_extractor is not None and
                 str(self.feature_extractor) in h5_f.keys()):
                 feat_group = h5_f[str(self.feature_extractor)]
-                self.feature_extractor = None
+                self.feature_extractor = self.feature_extractor.slice
 
             if dt_name and dt_name in feat_group.keys():
                 dt_iter = self.flow_from_h5(feat_group[dt_name])
@@ -120,7 +120,7 @@ class DatasetGenerator(object):
                 str(self.feature_extractor) in h5_f.keys()):
                 feat_group = h5_f[str(self.feature_extractor)]
                 # it's not necessary, feature already exists
-                self.feature_extractor = None
+                self.feature_extractor = self.feature_extractor.slice
             else:
                 self._logger.warning('Feature not found in hdf5 file. Calculating in real time. This might slow down training.')
 
