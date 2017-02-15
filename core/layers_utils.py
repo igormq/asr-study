@@ -2,11 +2,11 @@
 from __future__ import absolute_import
 
 import keras.backend as K
-from keras import activations, initializations, regularizers
-from keras.layers import GRU, LSTM, SimpleRNN
-
-
 import tensorflow as tf
+
+from keras import activations, initializations, regularizers
+from keras.layers import GRU, SimpleRNN
+from keras.layers import LSTM as keras_LSTM
 
 
 def highway_bias_initializer(shape, name=None):
@@ -41,37 +41,16 @@ def multiplicative_integration(Wx, Uz, params, has_input=True):
     beta1 = params
     return beta1 * Uz
 
-
-def recurrent(output_dim, model='lstm', activation='tanh', regularizer=None,
-              dropout=0., zoneout=0., **kwargs):
-    if model == 'rnn':
-        return SimpleRNN(output_dim, activation=activation,
-                         W_regularizer=regularizer, U_regularizer=regularizer,
-                         dropout_W=dropout, dropout_U=dropout,
-                         zoneout_h=zoneout, consume_less='gpu', **kwargs)
-    if model == 'gru':
-        return GRU(output_dim, activation=activation,
-                   W_regularizer=regularizer, U_regularizer=regularizer,
-                   dropout_W=dropout, dropout_U=dropout, zoneout_h=dropout,
-                   consume_less='gpu', **kwargs)
-    if model == 'lstm':
-        return LSTM(output_dim, activation=activation,
-                    W_regularizer=regularizer, U_regularizer=regularizer,
-                    dropout_W=dropout, dropout_U=dropout, zoneout_h=zoneout,
-                    zoneout_c=zoneout, consume_less='gpu', **kwargs)
-    if model == 'rhn':
-        return RHN(output_dim, depth=1,
-                     bias_init=highway_bias_initializer,
-                     activation=activation, layer_norm=False, ln_gain_init='one',
-                     ln_bias_init='zero', mi=False,
-                     W_regularizer=regularizer, U_regularizer=regularizer,
-                     dropout_W=dropout, dropout_U=dropout, consume_less='gpu' **kwargs)
-    raise ValueError('model %s was not recognized' % model)
-
 def to_dense(x):
     if K.is_sparse(x):
         return tf.sparse_tensor_to_dense(x, default_value=-1)
     return x
 
+
 def to_dense_output_shape(input_shape):
     return input_shape
+
+
+LN = layer_normalization
+mi = multiplicative_integration
+mi_init = multiplicative_integration_init
