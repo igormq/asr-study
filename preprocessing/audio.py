@@ -67,6 +67,17 @@ class Feature(object):
     def num_feats(self):
         raise NotImplementedError("num_feats must be overrided")
 
+    def slice(self, x):
+        ''' Crop the ndarray until num_feats
+
+        Hint:
+            this is useful when MFCC coefficients are generated with delta and double delta enabled but, we only want this features with the delta values.
+        '''
+        if x.shape[-1] == self.num_feats:
+            return x
+
+        return x[..., :self.num_feats]
+
 
 class FBank(Feature):
     """Compute Mel-filterbank energy features from an audio signal.
@@ -315,7 +326,7 @@ class LogFbank(FBank):
         dd: if True add delta-deltas coeficients. Default False
     """
 
-    def __init__(self, append_energy=False, d=False, dd=False, **kwargs):
+    def __init__(self, d=False, dd=False, append_energy=False, **kwargs):
         """Constructor
         """
 
@@ -337,7 +348,6 @@ class LogFbank(FBank):
              A numpy array of size (NUMFRAMES by nfilt) containing features.
              Each row holds 1 feature vector.
         """
-
         feat, energy = super(LogFbank, self)._call(signal)
 
         feat = np.log(feat)
