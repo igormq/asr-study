@@ -22,7 +22,7 @@ from keras.layers import Dropout
 
 from keras.regularizers import l1, l2, l1l2
 
-from .layers_utils import recurrent
+from .layers import recurrent
 
 
 def ctc_model(input_, output, **kwargs):
@@ -162,6 +162,78 @@ def zoneout_rnn(hparams):
                                     regularizer=l2(params.weight_decay),
                                     dropout=params.dropout,
                                     zoneout=params.zoneout))(o)
+
+    o = TimeDistributed(Dense(params.nb_classes,
+                              W_regularizer=l2(params.weight_decay)))(o)
+
+    return ctc_model(x, o)
+
+def imlstm(hparams):
+    """ Improved LSTM:
+        * Residual connection
+        * Variational Dropout
+        * Zoneout
+        * Layer Normalization
+        * Multiplicative Integration
+    Note:
+        Dropout, zoneout and weight decay is tied through layers, in order to
+        minimizing the number of hyper parameters
+    Reference:
+        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in
+        Recurrent Neural Networks", 2015.
+        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech
+        recognition with deep recurrent neural networks", 2013.
+        [3] Krueger, David, et al. "Zoneout: Regularizing rnns by randomly
+        preserving hidden activations", 2016.
+        [4] Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E. Hinton. "Layer normalization.", 2016.
+        [5] Wu, Yuhuai, et al. "On multiplicative integration with recurrent neural networks." Advances In Neural Information Processing Systems. 2016.
+        [6] Wu, Yonghui, et al. "Google's Neural Machine Translation System: Bridging the Gap between Human and Machine Translation.", 2016.
+    """
+    params = HParams(nb_features=120,
+                     nb_classes=28,
+                     nb_hidden=320,
+                     nb_layers=4,
+                     dropout=0.,
+                     zoneout=0.,
+                     input_dropout=False,
+                     input_std_noise=.0,
+                     weight_decay=1e-4,
+                     res_con=False,
+                     layer_norm=False, ln_init=['one', 'zero'],
+                     mi=False, mi_init=['one', 'one', 'one'],
+                     activation='tanh')
+
+    params.parse(hparams)
+
+    x = Input(name='input', shape=(None, params.nb_features))
+    o = x
+
+    if params.input_std_noise is not None:
+        o = GaussianNoise(params.input_std_noise)(o)
+
+    if params.res_con:
+        o = TimeDistributed(Dense(params.nb_hidden,
+                                  W_regularizer=l2(params.weight_decay)))(o)
+
+    if params.input_dropout:
+        o = Dropout(params.dropout)(o)
+
+    for _ in range(params.nb_layers):
+        new_o = Bidirectional(recurrent(params.nb_hidden,
+                                        model='lstm',
+                                        return_sequences=True,
+                                        regularizer=l2(params.weight_decay),
+                                        dropout=params.dropout,
+                                        zoneout=params.zoneout,
+                                        mi=params.mi, mi_init=params.mi_init,
+                                        layer_norm=params.layer_norm,
+                                        ln_init=params.ln_init,
+                                        activation=params.activation))(o)
+
+        if params.res_con:
+            o = new_o + o
+        else:
+            o = new_o
 
     o = TimeDistributed(Dense(params.nb_classes,
                               W_regularizer=l2(params.weight_decay)))(o)
