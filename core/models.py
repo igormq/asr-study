@@ -185,9 +185,13 @@ def imlstm(hparams):
         recognition with deep recurrent neural networks", 2013.
         [3] Krueger, David, et al. "Zoneout: Regularizing rnns by randomly
         preserving hidden activations", 2016.
-        [4] Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E. Hinton. "Layer normalization.", 2016.
-        [5] Wu, Yuhuai, et al. "On multiplicative integration with recurrent neural networks." Advances In Neural Information Processing Systems. 2016.
-        [6] Wu, Yonghui, et al. "Google's Neural Machine Translation System: Bridging the Gap between Human and Machine Translation.", 2016.
+        [4] Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E. Hinton. "Layer
+        normalization.", 2016.
+        [5] Wu, Yuhuai, et al. "On multiplicative integration with recurrent
+        neural networks." Advances In Neural Information Processing Systems.
+        2016.
+        [6] Wu, Yonghui, et al. "Google's Neural Machine Translation System:
+        Bridging the Gap between Human and Machine Translation.", 2016.
     """
     params = HParams(nb_features=120,
                      nb_classes=28,
