@@ -361,6 +361,8 @@ class LSTM(keras_layers.LSTM):
                                    U_regularizer, b_regularizer, dropout_W,
                                    dropout_U, zoneout_h, zoneout_c, **kwargs)
 
+        if len(ln_init) == 2 and int in [type(l) for l in ln_init]:
+	    ln_init = [lambda shape, name=None: l*K.ones(shape, name=name) for l in ln_init]
         self.layer_norm = layer_norm
         self.ln_init = ln_init
         self.mi_init = mi_init
@@ -409,14 +411,14 @@ to option `gpu`.")
                 initializer=ln_bias_init,
                 name='{}_ln_bias_h'.format(self.name))
 
-            self.ln_gain_c = self.add_weight(
-                (self.output_dim, ),
-                initializer=ln_gain_init,
-                name='{}_ln_gain_c'.format(self.name))
-            self.ln_bias_c = self.add_weight(
-                (self.output_dim, ),
-                initializer=ln_bias_init,
-                name='{}_ln_bias_c'.format(self.name))
+#            self.ln_gain_c = self.add_weight(
+#                (self.output_dim, ),
+#                initializer=ln_gain_init,
+#                name='{}_ln_gain_c'.format(self.name))
+#            self.ln_bias_c = self.add_weight(
+#                (self.output_dim, ),
+#                initializer=ln_bias_init,
+#                name='{}_ln_bias_c'.format(self.name))
 
     def step(self, x, states):
         h_tm1 = states[0]
@@ -451,8 +453,9 @@ to option `gpu`.")
             c = zoneout(self.zoneout_c, c_tm1, c,
                         noise_shape=(self.output_dim,))
         c_ln = c
-        if self.layer_norm:
-            c_ln = LN(c, self.ln_gain_c, self.ln_bias_c)
+        # this is returning a lot of Nan
+        #if self.layer_norm:
+        #    c_ln = LN(c, self.ln_gain_c, self.ln_bias_c)
 
         h = o * self.activation(c_ln)
         if 0 < self.zoneout_h < 1:
