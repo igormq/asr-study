@@ -102,13 +102,23 @@ def get_custom_objects():
 
 def load_meta(model_fname):
     meta = {}
-    with h5py.File(model_fname, 'r') as f:
-        meta_group = f['meta']
 
-        meta['training_args'] = yaml.load(
-            meta_group.attrs['training_args'])
-        for k in meta_group.keys():
-            meta[k] = list(meta_group[k])
+    try:
+        with h5py.File(model_fname, 'r') as f:
+            meta_group = f['meta']
+
+            meta['training_args'] = yaml.load(
+                meta_group.attrs['training_args'])
+            for k in meta_group.keys():
+                meta[k] = list(meta_group[k])
+    except KeyError:
+        # Tries to load the yaml file
+        meta_fname = os.path.join(os.path.split(model_fname)[0], 'meta.yaml')
+        if not os.path.isfile(meta_fname):
+            raise Exception("Meta information was not found")
+
+        with open(meta_fname, 'r') as f:
+            meta = yaml.load(f)
 
     return meta
 
