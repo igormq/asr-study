@@ -6,6 +6,7 @@ import core.ctc_utils as ctc_utils
 from common.hparams import HParams
 
 import keras
+import keras.backend as K
 from keras.initializations import uniform
 
 from keras.models import Model
@@ -19,6 +20,7 @@ from keras.layers import Masking
 from keras.layers import Bidirectional
 from keras.layers import Lambda
 from keras.layers import Dropout
+from keras.layers import merge
 
 from keras.regularizers import l1, l2, l1l2
 
@@ -216,13 +218,13 @@ def imlstm(hparams):
         o = GaussianNoise(params.input_std_noise)(o)
 
     if params.res_con:
-        o = TimeDistributed(Dense(params.nb_hidden,
+        o = TimeDistributed(Dense(params.nb_hidden*2,
                                   W_regularizer=l2(params.weight_decay)))(o)
 
     if params.input_dropout:
         o = Dropout(params.dropout)(o)
 
-    for _ in range(params.nb_layers):
+    for i, _ in enumerate(range(params.nb_layers)):
         new_o = Bidirectional(recurrent(params.nb_hidden,
                                         model='lstm',
                                         return_sequences=True,
@@ -235,7 +237,7 @@ def imlstm(hparams):
                                         activation=params.activation))(o)
 
         if params.res_con:
-            o = new_o + o
+            o = merge([new_o,  o], mode='sum')
         else:
             o = new_o
 
