@@ -26,9 +26,11 @@ class Feature(object):
         eps
     """
 
-    def __init__(self, fs=16e3, eps=1e-14):
+    def __init__(self, fs=16e3, eps=1e-14, stride=1, num_context=0):
         self.fs = fs
         self.eps = eps
+        self.stride = stride
+        self.num_context = num_context
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
 
@@ -50,15 +52,99 @@ class Feature(object):
             os.path.isfile(audio)):
             audio, current_fs = librosa.audio.load(audio)
             audio = librosa.core.resample(audio, current_fs, self.fs)
-            return self._call(audio)
+            feats = self._call(audio)
+        elif type(audio) in (np.ndarray, list) and len(audio) > 1:
+            feats = self._call(audio)
+        else:
+            TypeError("audio type is not support")
 
-        if type(audio) in (np.ndarray, list) and len(audio) > 1:
-            return self._call(audio)
-
-        raise TypeError("audio type is not support")
+        return self._postprocessing(feats)
 
     def _call(self, data):
         raise NotImplementedError("__call__ must be overrided")
+
+    def _postprocessing(self, feats):
+        # Code adapted from
+        # https://github.com/mozilla/DeepSpeech/blob/master/util/audio.py
+
+        # We only keep every second feature (BiRNN stride = 2)
+        feats = feats[::self.stride]
+
+        if self.num_context == 0:
+            return feats
+
+        num_feats = feats.shape[1]
+
+        """For each time slice of the training set, we need to copy the context
+        this makes the numcep dimensions vector into a numcep +
+        2*numcep*self.num_context dimensions because of:
+          - num_feats dimensions for the current mfcc feature set
+          - num_context*numcep dimensions for each of the past and future (x2)
+          mfcc feature set
+         => so num_feats + 2*num_context*num_feats
+        """
+        train_inputs = np.array([], np.float32)
+        train_inputs.resize((feats.shape[0],
+                            num_feats + 2*num_feats*self.num_context))
+
+        # Prepare pre-fix post fix context
+        # (TODO: Fill empty_mfcc with MCFF of silence)
+        empty_mfcc = np.array([])
+        empty_mfcc.resize((num_feats))
+
+        # Prepare train_inputs with past and future contexts
+        time_slices = range(train_inputs.shape[0])
+        context_past_min = time_slices[0] + self.num_context
+        context_future_max = time_slices[-1] - self.num_context
+        for time_slice in time_slices:
+            # Reminder: array[start:stop:step]
+            # slices from indice |start| up to |stop| (not included), every
+            # |step|
+            # Pick up to self.num_context time slices in the past, and complete
+            # with empty
+            # mfcc features
+            need_empty_past = max(0, (context_past_min - time_slice))
+            empty_source_past = list(empty_mfcc for empty_slots
+                                     in range(need_empty_past))
+            data_source_past = feats[max(0, time_slice -
+                                         self.num_context):time_slice]
+            assert(len(empty_source_past) +
+                   len(data_source_past) == self.num_context)
+
+            # Pick up to self.num_context time slices in the future, and
+            # complete with empty
+            # mfcc features
+            need_empty_future = max(0, (time_slice - context_future_max))
+            empty_source_future = list(empty_mfcc
+                                       for empty_slots in
+                                       range(need_empty_future))
+            data_source_future = feats[time_slice + 1:time_slice +
+                                       self.num_context + 1]
+
+            assert(len(empty_source_future) +
+                   len(data_source_future) == self.num_context)
+
+            if need_empty_past:
+                past = np.concatenate((empty_source_past, data_source_past))
+            else:
+                past = data_source_past
+
+            if need_empty_future:
+                future = np.concatenate((data_source_future,
+                                         empty_source_future))
+            else:
+                future = data_source_future
+
+            past = np.reshape(past, self.num_context*num_feats)
+            now = feats[time_slice]
+            future = np.reshape(future, self.num_context*num_feats)
+
+            train_inputs[time_slice] = np.concatenate((past, now, future))
+            assert(len(train_inputs[time_slice])
+                   == num_feats + 2*num_feats*self.num_context)
+
+        # Return results
+        return train_inputs
 
     def __str__(self):
         raise NotImplementedError("__str__ must be overrided")
