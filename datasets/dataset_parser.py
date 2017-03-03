@@ -19,14 +19,14 @@ class DatasetParser(object):
     '''
 
     def __init__(self, dt_dir=None, name=None,
-                 text_parser=text.CharParser('s|S|a|p')):
+                 text_parser=text.CharParser('s|S|a|p'), h5_fname=None):
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
         self.dt_dir = dt_dir
         self._name = name
         self.output_dir = os.path.join(DT_ABSPATH, self.name)
         self.json_fname = os.path.join(self.output_dir, 'data.json')
-        self.h5_fname = os.path.join(self.output_dir, 'data.h5')
+        self.h5_fname = os.path.join(self.output_dir, h5_fname or 'data.h5')
         self.text_parser = text_parser
 
         self.has_json = False
@@ -88,7 +88,7 @@ class DatasetParser(object):
             logger.info(report)
             f.write(report + '\n')
 
-    def to_h5(self, feat_map=audio.raw, override=False, h5_fname=None):
+    def to_h5(self, feat_map=audio.raw, override=False):
         ''' Generates h5df file for the dataset
         Note that this function will calculate the features rather than store
         the url to the audio file
@@ -96,8 +96,6 @@ class DatasetParser(object):
 
         if not issubclass(feat_map.__class__, audio.Feature):
             raise TypeError("feat_map must be an instance of audio.Feature")
-
-        h5_fname = h5_fname or self.h5_fname
 
         feat_name = str(feat_map)
 
@@ -109,7 +107,7 @@ class DatasetParser(object):
                                   parameter `override` to `True`")
 
         self._logger.info('Opening %s', self.h5_fname)
-        with h5py.File(h5_fname) as f:
+        with h5py.File(self.h5_fname) as f:
 
             # If the key already exists
             if feat_name in f.keys():
