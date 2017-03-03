@@ -241,10 +241,15 @@ class MFCC(FBank):
         is replaced with the log of the total frame energy.
         d: if True add deltas coeficients. Default True
         dd: if True add delta-deltas coeficients. Default True
+        norm: if 'cmn' performs the cepstral mean normalization. elif 'cmvn'
+        performs the cepstral mean and variance normalizastion. Default 'cmn'
     """
 
     def __init__(self, num_cep=13, cep_lifter=22, append_energy=True,
-                 d=True, dd=True, **kwargs):
+                 d=True, dd=True, norm='cmn', **kwargs):
+
+        if norm.lower() not in ('cmvn', 'cmn'):
+            raise ValueError('norm method not recognized.')
 
         super(MFCC, self).__init__(**kwargs)
 
@@ -253,6 +258,7 @@ class MFCC(FBank):
         self.append_energy = append_energy
         self.d = d
         self.dd = dd
+        self.norm = norm.lower()
 
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
@@ -274,6 +280,10 @@ class MFCC(FBank):
         feat = dct(feat, type=2, axis=1, norm='ortho')[:, :self.num_cep]
         feat = self._lifter(feat, self.cep_lifter)
 
+        if self.append_energy:
+            # replace first cepstral coefficient with log of frame energy
+            feat[:, 0] = np.log(energy + self.eps)
+
         if self.d:
             d = delta(feat, 2)
             feat = np.hstack([feat, d])
@@ -281,9 +291,10 @@ class MFCC(FBank):
             if self.dd:
                 feat = np.hstack([feat, delta(d, 2)])
 
-        if self.append_energy:
-            # replace first cepstral coefficient with log of frame energy
-            feat[:, 0] = np.log(energy + self.eps)
+        if self.norm.startswith('cm'):
+            feat -= np.mean(feat, axis=0)
+            if self.norm == 'cmvn':
+                feat /= (np.std(feat, axis=0) + self.eps)
 
         return feat
 
