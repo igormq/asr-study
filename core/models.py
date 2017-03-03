@@ -8,6 +8,7 @@ from common.hparams import HParams
 import keras
 import keras.backend as K
 from keras.initializations import uniform
+from keras.activations import relu
 
 from keras.models import Model
 
@@ -243,5 +244,81 @@ def imlstm(hparams):
 
     o = TimeDistributed(Dense(params.nb_classes,
                               W_regularizer=l2(params.weight_decay)))(o)
+
+    return ctc_model(x, o)
+
+
+def deep_speech(hparams):
+    """ Deep Speech model.
+
+        Contains five layers: 3 FC - BRNN - 1 FC
+        Dropout only applied to fully connected layers (between 5% to 10%)
+
+    Note:
+        * We are not translating the raw audio files by 5 ms (Sec 2.1 in [1])
+        * We are not striding the RNN to halve the timesteps (Sec 3.3 in [1])
+        * We are not using frames of context
+        * Their output contains {a, ..., z, space, apostrophe, blank}
+    Experiment 5.1: Conversational speech: Switchboard Hub5'00 (full)
+        * Input - 80 linearly spaced log filter banks and an energy term. The
+        filter banks are computed over windows of 20ms strided by 10ms.
+        * Speaker adaptation - spectral features are normalized on a per
+        speaker basis.
+        * Hidden units: {2304, 2048}
+        * Essemble of 4 networks
+    Experiment 5.2: Noisy speech
+        * Input - 160 linearly spaced log filter banks. The filter banks are
+        computed over windows of 20ms strided by 10ms. Global mean and standard
+        deviation over training set normalization
+        * Speaker adaptation - none
+        * Hidden units: 2560
+        * Essemble of 6 networks
+    Reference:
+        [1] HANNUN, A. Y. et al. Deep Speech: Scaling up end-to-end speech
+        recognition. arXiV, 2014.
+    """
+    params = HParams(nb_features=81,
+                     nb_classes=29,
+                     nb_hidden=2048,
+                     dropout=0.1,
+                     max_value=20)
+
+    params.parse(hparams)
+
+    x = Input(name='input', shape=(None, params.nb_features))
+    o = x
+
+    def clipped_relu(x):
+        return relu(x, max_value=params.max_value)
+
+    # First layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
+    o = TimeDistributed(Dropout(params.dropout))(o)
+
+    # Second layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
+    o = TimeDistributed(Dropout(params.dropout))(o)
+
+    # Third layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
+    o = TimeDistributed(Dropout(params.dropout))(o)
+
+    # Fourth layer
+    o = Bidirectional(SimpleRNN(params.nb_hidden, return_sequences=True,
+                                dropout_W=params.dropout,
+                                activation=clipped_relu,
+                                init='he_normal'), merge_mode='sum')(o)
+    o = TimeDistributed(Dropout(params.dropout))(o)
+
+    # Fifth layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
+    o = TimeDistributed(Dropout(params.dropout))(o)
+
+    # Output layer
+    o = TimeDistributed(Dense(params.nb_classes))(o)
 
     return ctc_model(x, o)
