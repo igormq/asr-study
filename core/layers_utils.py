@@ -33,6 +33,16 @@ def multiplicative_integration_init(shape, alpha_init='one',
     return beta1
 
 
+def zoneout(level, h_tm1, h, noise_shape):
+    '''Apply a zoneout function to preserve a fraction of values from h_tm1 in h.'''
+    h_diff = h - h_tm1
+    h = K.in_train_phase(K.dropout(h_diff,
+                                   level,
+                                   noise_shape=noise_shape), h_diff)
+    h = h * (1. - level) + h_tm1
+    return h
+
+
 def multiplicative_integration(Wx, Uz, params, has_input=True):
     if has_input:
         alpha, beta1, beta2 = params
