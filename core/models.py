@@ -78,6 +78,37 @@ def graves2006(hparams=None):
 
     return ctc_model(x, o)
 
+def eyben(hparams=None):
+    """ Implementation of Eybens' model
+    Reference:
+        [1] Eyben, Florian, et al. "From speech to letters-using a novel neural network architecture for grapheme based asr." Automatic Speech Recognition & Understanding, 2009. ASRU 2009. IEEE Workshop on. IEEE, 2009.
+    """
+    params = HParams(nb_features=39,
+                     nb_hidden=[78 120 27],
+                     nb_classes=28)
+
+    params.parse(hparams)
+
+    assert len(params.nb_hidden) == 3
+
+    x = Input(name='input', shape=(None, params.nb_features))
+    o = x
+
+    if params.nb_hidden[0]:
+        o = TimeDistributed(Dense(params.nb_hidden[0]))(o)
+    if params.nb_hidden[1]:
+        o = Bidirectional(LSTM(params.nb_hidden[1],
+                          return_sequences=True,
+                          consume_less='gpu'))(o)
+    if params.nb_hidden[2]:
+        o = Bidirectional(LSTM(params.nb_hidden[2],
+                          return_sequences=True,
+                          consume_less='gpu'))(o)
+
+    o = TimeDistributed(Dense(params.nb_classes))(o)
+
+    return ctc_model(x, o)
+
 
 def bayesian_lstm(hparams):
     """ LSTM with variational dropout and weight decay. Following the best
@@ -317,6 +348,53 @@ def deep_speech(hparams):
     o = TimeDistributed(Dense(params.nb_hidden))(o)
     o = TimeDistributed(Activation(clipped_relu))(o)
     o = TimeDistributed(Dropout(params.dropout))(o)
+
+    # Output layer
+    o = TimeDistributed(Dense(params.nb_classes))(o)
+
+    return ctc_model(x, o)
+
+
+def maas(hparams):
+    """ Maas' model.
+    Reference:
+        [1] Maas, Andrew L., et al. "Lexicon-Free Conversational Speech Recognition with Neural Networks." HLT-NAACL. 2015.
+    """
+    params = HParams(nb_features=81,
+                     nb_classes=29,
+                     nb_hidden=1824,
+                     dropout=0.1,
+                     max_value=20)
+
+    params.parse(hparams)
+
+    x = Input(name='input', shape=(None, params.nb_features))
+    o = x
+
+    def clipped_relu(x):
+        return relu(x, max_value=params.max_value)
+
+    # First layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
+
+    # Second layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
+
+    # Third layer
+    o = Bidirectional(SimpleRNN(params.nb_hidden, return_sequences=True,
+                                dropout_W=params.dropout,
+                                activation=clipped_relu,
+                                init='he_normal'), merge_mode='sum')(o)
+
+    # Fourth layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
+
+    # Fifth layer
+    o = TimeDistributed(Dense(params.nb_hidden))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
 
     # Output layer
     o = TimeDistributed(Dense(params.nb_classes))(o)
