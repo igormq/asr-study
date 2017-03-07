@@ -5,6 +5,7 @@ from __future__ import print_function
 import os
 # Preventing pool_allocator message
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import logging
 
 try:
     import warpctc_tensorflow
@@ -38,7 +39,6 @@ import json
 import datetime
 import inspect
 
-import logging
 import common.utils as utils
 
 if __name__ == '__main__':
