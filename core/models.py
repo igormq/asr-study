@@ -84,7 +84,7 @@ def eyben(hparams=None):
         [1] Eyben, Florian, et al. "From speech to letters-using a novel neural network architecture for grapheme based asr." Automatic Speech Recognition & Understanding, 2009. ASRU 2009. IEEE Workshop on. IEEE, 2009.
     """
     params = HParams(nb_features=39,
-                     nb_hidden=[78 120 27],
+                     nb_hidden=[78, 120, 27],
                      nb_classes=28)
 
     params.parse(hparams)
