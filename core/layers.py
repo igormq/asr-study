@@ -363,10 +363,10 @@ class LSTM(keras_layers.LSTM):
 
         if len(ln_init) == 2 and float in [type(l) for l in ln_init]:
             ln_init = [lambda shape,
-                       name=None: l*K.ones(shape, name=name) for l in ln_init]
+                       name=None: K.variable(l*np.ones(shape), dtype='float32', name=name) for l in ln_init]
         if len(mi_init) == 3 and float in [type(m) for m in mi_init]:
             mi_init = [lambda shape,
-                       name=None: m*K.ones(shape, name=name) for m in mi_init]
+                       name=None: K.variable(m*np.ones(shape), dtype='float32', name=name) for m in mi_init]
         self.layer_norm = layer_norm
         self.ln_init = ln_init
         self.mi_init = mi_init
