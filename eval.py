@@ -3,6 +3,9 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import codecs
+import json
+import numpy as np
 # Preventing pool_allocator message
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -12,7 +15,7 @@ import inspect
 
 from preprocessing import audio, text
 from common import utils
-from common.dataset_generator import DatasetGenerator
+from common.dataset_generator import DatasetGenerator, DatasetIterator
 from common.hparams import HParams
 
 if __name__ == '__main__':
@@ -69,3 +72,18 @@ if __name__ == '__main__':
 
     for m, v in zip(model.metrics_names, metrics):
         print('%s: %4f' % (m, v))
+
+    del model
+    data = h5py.File(args.dataset)
+
+    model_p = utils.load_model(args.model, mode='predict')
+    results = []
+    for i in range(len(data['mfcc']['test']['inputs'])):
+        data_it = DatasetIterator(np.array([np.array(data['mfcc']['test']['inputs'][i]).reshape((-1, 39))]))
+        label = data['mfcc']['test']['labels'][i]
+        prediction = model_p.predict(data_it.next())
+        prediction = text_parser.imap(prediction[0])
+        results.append({'label': label, 'best': prediction})
+
+    with codecs.open('results_2.json', 'w', encoding='utf8') as f:
+        json.dump(results, f)
