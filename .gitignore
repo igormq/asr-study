@@ -196,3 +196,6 @@ timit
 results/
 .datasets/
 .envrc
+notebooks/
+sims/
+results*/
