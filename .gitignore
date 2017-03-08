@@ -195,3 +195,4 @@ timit
 *.h5
 results/
 .datasets/
+.envrc
