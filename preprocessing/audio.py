@@ -143,6 +143,7 @@ class Feature(object):
             assert(len(train_inputs[time_slice])
                    == num_feats + 2*num_feats*self.num_context)
 
+        self._num_feats = num_feats + 2*num_feats*self.num_context
         # Return results
         return train_inputs
 
@@ -151,7 +152,7 @@ class Feature(object):
 
     @property
     def num_feats(self):
-        raise NotImplementedError("num_feats must be overrided")
+	return self._num_feats
 
     def slice(self, x):
         ''' Crop the ndarray until num_feats
@@ -202,8 +203,9 @@ class FBank(Feature):
         self.high_freq = high_freq or self.fs / 2
         self.pre_emph = pre_emph
         self.win_fun = win_fun
-
         self._filterbanks = self._get_filterbanks()
+        
+        self._num_feats = self.num_filt
 
     @property
     def mel_points(self):
@@ -312,9 +314,6 @@ class FBank(Feature):
     def __str__(self):
         return "fbank"
 
-    def num_feats(self):
-        return self.num_filt
-
 
 class MFCC(FBank):
     """Compute MFCC features from an audio signal.
@@ -345,6 +344,7 @@ class MFCC(FBank):
         self.d = d
         self.dd = dd
         self.norm = norm.lower()
+        self._num_feats = (1 + self.d + self.dd) * self.num_cep
 
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
@@ -408,10 +408,6 @@ class MFCC(FBank):
     def __str__(self):
         return "mfcc"
 
-    @property
-    def num_feats(self):
-        return (1 + self.d + self.dd) * self.num_cep
-
 
 class LogFbank(FBank):
     """Compute Mel-filterbank energy features from an audio signal.
@@ -432,6 +428,7 @@ class LogFbank(FBank):
         self.d = d
         self.dd = dd
         self.append_energy = append_energy
+        self._num_feats = (1 + self.d + self.dd) * (self.num_filt + self.append_energy)
 
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
@@ -463,11 +460,6 @@ class LogFbank(FBank):
 
     def __str__(self):
         return "logfbank"
-
-    @property
-    def num_feats(self):
-        return (1 + self.d + self.dd) * (self.num_filt + self.append_energy)
-
 
 class Raw(Feature):
     """ Raw features extractor
