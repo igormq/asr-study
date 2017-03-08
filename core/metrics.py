@@ -7,6 +7,7 @@ def ler(y_true, y_pred, **kwargs):
     """
     return tf.reduce_mean(tf.edit_distance(y_pred, y_true, **kwargs))
 
+
 def wer(r, h):
     """
     Calculation of WER with Levenshtein distance.
@@ -53,8 +54,8 @@ def wer(r, h):
                 d[i][j] = d[i-1][j-1]
             else:
                 substitution = d[i-1][j-1] + 1
-                insertion    = d[i][j-1] + 1
-                deletion     = d[i-1][j] + 1
+                insertion = d[i][j-1] + 1
+                deletion = d[i-1][j] + 1
                 d[i][j] = min(substitution, insertion, deletion)
 
     return d[len(r)][len(h)]

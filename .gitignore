@@ -142,7 +142,7 @@ docs/_build/
 target/
 
 # IPython Notebook
-.ipynb_checkpoints
+.ipynum_checkpoints
 
 # pyenv
 .python-version
@@ -167,7 +167,7 @@ ENV/
 
 ### IPythonNotebook ###
 # Temporary data
-.ipynb_checkpoints/
+.ipynum_checkpoints/
 
 
 ### Windows ###

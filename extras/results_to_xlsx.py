@@ -31,20 +31,7 @@ if __name__ == "__main__":
             print('model.h5 not found in %s' % subdir)
             continue
 
-        meta = None
-        try:
-            meta = load_meta(os.path.join(subdir, 'model.h5'))
-        except KeyError:
-            print("%s/model.h5 doesn't have meta attribute" % subdir)
-
-            if 'meta.yaml' not in files:
-                print('\t%s/meta.yaml not found either. Ignoring file'
-                      % subdir)
-                continue
-
-            with open(os.path.join(subdir, 'meta.yaml'), 'r') as f:
-                meta = yaml.load(f)
-
+        meta = load_meta(os.path.join(subdir, 'model.h5'))
         metas[subdir.split(os.sep)[-1]] = meta
 
     training_args = list(set([arg for model in metas for arg in

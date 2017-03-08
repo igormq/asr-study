@@ -4,8 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from common.sigproc import delta
-from common import sigproc
+from . import audio_utils as sigproc
 
 import os
 import numpy as np
@@ -26,9 +25,14 @@ class Feature(object):
         eps
     """
 
-    def __init__(self, fs=16e3, eps=1e-14, stride=1, num_context=0):
+    def __init__(self, fs=16e3, eps=1e-8, stride=1, num_context=0,
+                 mean_norm=True, var_norm=True):
         self.fs = fs
         self.eps = eps
+
+        self.mean_norm = mean_norm
+        self.var_norm = var_norm
+
         self.stride = stride
         self.num_context = num_context
         self._logger = logging.getLogger('%s.%s' % (__name__,
@@ -48,8 +52,7 @@ class Feature(object):
             TypeError if audio were not recognized
 
         """
-        if ((isinstance(audio, str) or isinstance(audio, unicode)) and
-            os.path.isfile(audio)):
+        if (isinstance(audio, str) or isinstance(audio, unicode)) and os.path.isfile(audio):
             audio, current_fs = librosa.audio.load(audio)
             audio = librosa.core.resample(audio, current_fs, self.fs)
             feats = self._call(audio)
@@ -58,10 +61,17 @@ class Feature(object):
         else:
             TypeError("audio type is not support")
 
-        return self._postprocessing(feats)
+        return self._standarize(self._postprocessing(feats))
 
     def _call(self, data):
         raise NotImplementedError("__call__ must be overrided")
+
+    def _standarize(self, feats):
+        if self.mean_norm:
+            feats -= np.mean(feats, axis=0, keepdims=True)
+        if self.var_norm:
+            feats /= (np.std(feats, axis=0, keepdims=True) + self.eps)
+        return feats
 
     def _postprocessing(self, feats):
         # Code adapted from
@@ -72,17 +82,8 @@ class Feature(object):
 
         if self.num_context == 0:
             return feats
-
         num_feats = feats.shape[1]
 
-        """For each time slice of the training set, we need to copy the context
-        this makes the numcep dimensions vector into a numcep +
-        2*numcep*self.num_context dimensions because of:
-          - num_feats dimensions for the current mfcc feature set
-          - num_context*numcep dimensions for each of the past and future (x2)
-          mfcc feature set
-         => so num_feats + 2*num_context*num_feats
-        """
         train_inputs = np.array([], np.float32)
         train_inputs.resize((feats.shape[0],
                             num_feats + 2*num_feats*self.num_context))
@@ -144,7 +145,7 @@ class Feature(object):
                    == num_feats + 2*num_feats*self.num_context)
 
         self._num_feats = num_feats + 2*num_feats*self.num_context
-        # Return results
+
         return train_inputs
 
     def __str__(self):
@@ -152,18 +153,7 @@ class Feature(object):
 
     @property
     def num_feats(self):
-	return self._num_feats
-
-    def slice(self, x):
-        ''' Crop the ndarray until num_feats
-
-        Hint:
-            this is useful when MFCC coefficients are generated with delta and double delta enabled but, we only want this features with the delta values.
-        '''
-        if x.shape[-1] == self.num_feats:
-            return x
-
-        return x[..., :self.num_feats]
+        return self._num_feats
 
 
 class FBank(Feature):
@@ -204,7 +194,7 @@ class FBank(Feature):
         self.pre_emph = pre_emph
         self.win_fun = win_fun
         self._filterbanks = self._get_filterbanks()
-        
+
         self._num_feats = self.num_filt
 
     @property
@@ -331,10 +321,7 @@ class MFCC(FBank):
     """
 
     def __init__(self, num_cep=13, cep_lifter=22, append_energy=True,
-                 d=True, dd=True, norm='cmn', **kwargs):
-
-        if norm.lower() not in ('cmvn', 'cmn'):
-            raise ValueError('norm method not recognized.')
+                 d=True, dd=True, **kwargs):
 
         super(MFCC, self).__init__(**kwargs)
 
@@ -343,7 +330,6 @@ class MFCC(FBank):
         self.append_energy = append_energy
         self.d = d
         self.dd = dd
-        self.norm = norm.lower()
         self._num_feats = (1 + self.d + self.dd) * self.num_cep
 
         self._logger = logging.getLogger('%s.%s' % (__name__,
@@ -371,16 +357,11 @@ class MFCC(FBank):
             feat[:, 0] = np.log(energy + self.eps)
 
         if self.d:
-            d = delta(feat, 2)
+            d = sigproc.delta(feat, 2)
             feat = np.hstack([feat, d])
 
             if self.dd:
-                feat = np.hstack([feat, delta(d, 2)])
-
-        if self.norm.startswith('cm'):
-            feat -= np.mean(feat, axis=0)
-            if self.norm == 'cmvn':
-                feat /= (np.std(feat, axis=0) + self.eps)
+                feat = np.hstack([feat, sigproc.delta(d, 2)])
 
         return feat
 
@@ -428,7 +409,8 @@ class LogFbank(FBank):
         self.d = d
         self.dd = dd
         self.append_energy = append_energy
-        self._num_feats = (1 + self.d + self.dd) * (self.num_filt + self.append_energy)
+        self._num_feats = ((1 + self.d + self.dd)
+                           * (self.num_filt + self.append_energy))
 
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
@@ -450,32 +432,30 @@ class LogFbank(FBank):
             feat = np.hstack([feat, np.log(energy + self.eps)[:, np.newaxis]])
 
         if self.d:
-            d = delta(feat, 2)
+            d = sigproc.delta(feat, 2)
             feat = np.hstack([feat, d])
 
             if self.dd:
-                feat = np.hstack([feat, delta(d, 2)])
+                feat = np.hstack([feat, sigproc.delta(d, 2)])
 
         return feat
 
     def __str__(self):
         return "logfbank"
 
+
 class Raw(Feature):
     """ Raw features extractor
     """
     def __init__(self, **kwargs):
         super(Raw, self).__init__(**kwargs)
+        self._num_feats = None
 
     def _call(self, signal):
         return signal
 
     def __str__(self):
         return "raw"
-
-    @property
-    def num_feats(self):
-        return None
 
 
 raw = Raw()

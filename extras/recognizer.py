@@ -15,6 +15,8 @@ import common.utils as utils
 import common.apis as apis
 from common.dataset_generator import DatasetIterator
 
+from core.utils import setup_gpu
+
 import keras.backend as K
 from keras.models import Model
 from keras.layers import Lambda
@@ -55,7 +57,7 @@ if __name__ == "__main__":
                 # read the entire audio file
 
     if args.model is not None:
-        utils.config_gpu(args.gpu, args.allow_growth)
+        setup_gpu(args.gpu, args.allow_growth)
 
         model, meta = utils.load_model(args.model,
                                        return_meta=True,

@@ -17,6 +17,7 @@ from preprocessing import audio, text
 from common import utils
 from common.dataset_generator import DatasetGenerator, DatasetIterator
 from common.hparams import HParams
+from core.utils import setup_gpu
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluating an ASR system.')
@@ -39,13 +40,15 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--allow_growth', default=False, action='store_true')
 
+    parser.add_argument('--save_transcriptions', default=None, type=str)
+
     args = parser.parse_args()
     args_nondefault = utils.parse_nondefault_args(
         args, parser.parse_args(
             ['--model', args.model, '--dataset', args.dataset]))
 
     # GPU configuration
-    utils.config_gpu(args.gpu, args.allow_growth)
+    setup_gpu(args.gpu, args.allow_growth)
 
     # Loading model
     model, meta = utils.load_model(args.model, return_meta=True, mode='eval')
@@ -68,22 +71,25 @@ if __name__ == '__main__':
     test_flow = data_gen.flow_from_fname(args.dataset, dt_name='test')
 
     metrics = model.evaluate_generator(test_flow, test_flow.len,
-                                       max_q_size=10, nb_worker=1)
+                                       max_q_size=10, num_worker=1)
 
     for m, v in zip(model.metrics_names, metrics):
         print('%s: %4f' % (m, v))
 
-    del model
-    data = h5py.File(args.dataset)
+    if args.save_transcriptions:
+        del model
+        data = h5py.File(args.dataset)
 
-    model_p = utils.load_model(args.model, mode='predict')
-    results = []
-    for i in range(len(data['mfcc']['test']['inputs'])):
-        data_it = DatasetIterator(np.array([np.array(data['mfcc']['test']['inputs'][i]).reshape((-1, 39))]))
-        label = data['mfcc']['test']['labels'][i]
-        prediction = model_p.predict(data_it.next())
-        prediction = text_parser.imap(prediction[0])
-        results.append({'label': label, 'best': prediction})
+        model_p = utils.load_model(args.model, mode='predict')
+        results = []
+        for i in range(len(data['mfcc']['test']['inputs'])):
+            data_it = DatasetIterator(np.array(
+                [np.array(data['mfcc']['test']['inputs'][i])
+                 .reshape((-1, 39))]))
+            label = data[str(feats_extractor)]['test']['labels'][i]
+            prediction = model_p.predict(data_it.next())
+            prediction = text_parser.imap(prediction[0])
+            results.append({'label': label, 'best': prediction})
 
-    with codecs.open('results_2.json', 'w', encoding='utf8') as f:
-        json.dump(results, f)
+        with codecs.open(args.save_transcriptions, 'w', encoding='utf8') as f:
+            json.dump(results, f)

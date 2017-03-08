@@ -71,18 +71,18 @@ class LapsBM(DatasetParser):
                                       Skipping' % (audio_file, label))
                     continue
 
-                dt_name = 'valid'
+                dataset = 'valid'
                 if int(speaker_id) in self._test_speaker_id:
-                    dt_name = 'test'
+                    dataset = 'test'
 
                 data = {'duration': duration,
-                        'audio': audio_file,
+                        'input': audio_file,
                         'label': label,
                         'gender': gender,
                         'speaker': speaker_id}
 
                 if self._split:
-                    data['dt'] = dt_name
+                    data['dataset'] = dataset
 
                 yield data
 

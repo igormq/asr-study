@@ -51,19 +51,19 @@ class HUE(DatasetParser):
 
             for d in dataset._iter():
                 yield {'duration': d['duration'],
-                       'audio': d['audio'],
+                       'input': d['audio'],
                        'label': d['label'],
                        'speaker': '%s_%s' % (str(dataset), d['speaker']),
-                       'dt': 'train'}
+                       'dataset': 'train'}
 
         # Test and valid set
         lapsbm = LapsBM(dt_dir=self.dt_dir['lapsbm'], split=True)
         for d in lapsbm._iter():
             yield {'duration': d['duration'],
-                   'audio': d['audio'],
+                   'input': d['audio'],
                    'label': d['label'],
                    'speaker': '%s_%s' % (str(dataset), d['speaker']),
-                   'dt': d['dt']}
+                   'dataset': d['dataset']}
 
     def _report(self, dl):
         report = '''General information:

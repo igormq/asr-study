@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 import os
 import codecs
 import json
@@ -5,11 +7,10 @@ import h5py
 
 import numpy as np
 
-from datasets import DT_ABSPATH
-from common.utils import ld2dl
-
 from preprocessing import audio, text
+from datasets import DT_ABSPATH
 from common.utils import safe_mkdirs
+from common.utils import ld2dl
 
 import logging
 
@@ -18,29 +19,13 @@ class DatasetParser(object):
     '''Read data from directory and parser in a proper format
     '''
 
-    def __init__(self, dt_dir=None, name=None,
-                 text_parser=text.CharParser('s|S|a|p'), h5_fname=None):
+    def __init__(self, dt_dir=None, name=None):
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
         self.dt_dir = dt_dir
         self._name = name
-        self.output_dir = os.path.join(DT_ABSPATH, self.name)
-        self.json_fname = os.path.join(self.output_dir, 'data.json')
-        self.h5_fname = os.path.join(self.output_dir, h5_fname or 'data.h5')
-        self.text_parser = text_parser
 
-        self.has_json = False
-        if os.path.isfile(self.json_fname):
-            self._logger.debug('has_json = True')
-            self.has_json = True
-
-        self.has_h5 = False
-        if os.path.isfile(self.h5_fname):
-                self._logger.debug('has_h5 = True')
-                self.has_h5 = True
-
-        if not os.path.isdir(self.output_dir):
-            safe_mkdirs(self.output_dir)
+        self.default_output_dir = os.path.join(DT_ABSPATH, self.name)
 
     @property
     def dt_dir(self):
@@ -62,100 +47,107 @@ class DatasetParser(object):
             if not isinstance(d, dict):
                 raise TypeError("__loop must return a dict")
 
-            for k in ['audio', 'label']:
+            for k in ['input', 'label', 'duration']:
                 if k not in d:
                     raise KeyError("__loop must return a dict with %s key" % k)
 
             data.append(d)
         return data
 
-    def to_json(self, override=False):
+    def to_json(self, json_fname=None):
+        ''' Parse the entire dataset to a list of dictionary containin at least
+        two keys:
+            `input`: path to audio file
+            `duration`: length of the audio
+            `label`: transcription of the audio
+        '''
+        json_fname = json_fname or os.path.join(
+            self.default_output_dir, 'data.json')
 
-        if self.has_json and override is False:
-            raise IOError("JSON file already exists. If you want to override \
-                          the current file you must set the parameter \
-                          `override` to `True`")
+        if os.path.exists(json_fname) and override:
+            os.remove(json_fname)
 
-        report_fname = os.path.join(self.output_dir, 'json_report.txt')
+        if not os.path.isdir(os.path.split(json_fname)[0]):
+            safe_mkdirs(os.path.split(json_fname)[0])
 
         data = self._to_ld()
 
-        with codecs.open(self.json_fname, 'w', encoding='utf8') as f:
+        with codecs.open(json_fname, 'w', encoding='utf8') as f:
             json.dump(data, f)
 
-        report = self._report(ld2dl(data))
-        with open(report_fname, 'w') as f:
-            logger.info(report)
-            f.write(report + '\n')
+        print(self._report(ld2dl(data)))
 
-    def to_h5(self, feat_map=audio.raw, override=False):
+    def to_h5(self, h5_fname=None, feat_map=audio.raw,
+              split_sets=True, override=False):
         ''' Generates h5df file for the dataset
         Note that this function will calculate the features rather than store
-        the url to the audio file
-        '''
+        the path to the audio file
 
+        Args
+            split_sets: if True and dataset is split in several sets (e.g.
+            train, valid, test) the h5 file will create the corresponding
+            datasets; otherwise no dataset is create
+        '''
         if not issubclass(feat_map.__class__, audio.Feature):
             raise TypeError("feat_map must be an instance of audio.Feature")
 
+        h5_fname = h5_fname or os.path.join(self.default_output_dir, 'data.h5')
+
+        if h5py.is_hdf5(h5_fname) and override:
+            os.remove(h5_fname)
+
+        if not os.path.isdir(os.path.split(h5_fname)[0]):
+            safe_mkdirs(os.path.split(h5_fname)[0])
+
         feat_name = str(feat_map)
 
-        if self.has_h5:
-            with h5py.File(self.h5_fname, 'r') as f:
-                if feat_name in f.keys() and override is False:
-                    raise IOError("H5 file already exists. If you want to \
-                                  override the current file you must set the \
-                                  parameter `override` to `True`")
+        data = self._to_ld()
+        datasets = ['/']
+        if 'dataset' in data[0]:
+            datasets = list(set([d['dataset'] for d in data]))
 
-        self._logger.info('Opening %s', self.h5_fname)
-        with h5py.File(self.h5_fname) as f:
+        self._logger.info('Opening %s', h5_fname)
+        with h5py.File(h5_fname) as f:
 
-            # If the key already exists
-            if feat_name in f.keys():
-                del f[feat_name]
+            # create all datasets
+            for dataset in datasets:
 
-            ld = self._to_ld()
+                group = f['/']
+                if dataset != '/':
+                    group = f.create_group(dataset)
 
-            # handle with multiple datasets
-            def create_datasets(feat_group):
-                feats = feat_group.create_dataset(
+                inputs = group.create_dataset(
                     'inputs', (0,), maxshape=(None,),
                     dtype=h5py.special_dtype(vlen=np.dtype('float32')))
 
                 if feat_map.num_feats:
-                    feats.attrs['num_feats'] = feat_map.num_feats
+                    inputs.attrs['num_feats'] = feat_map.num_feats
 
-                labels = feat_group.create_dataset(
+                group.create_dataset(
                     'labels', (0,), maxshape=(None,),
                     dtype=h5py.special_dtype(vlen=unicode))
 
-                durations = feat_group.create_dataset(
+                group.create_dataset(
                     'durations', (0,), maxshape=(None,))
 
-            self._logger.debug('Creating %s group in hdf5 file', feat_name)
-            feat_group = f.create_group(feat_name)
+            for i, d in enumerate(data):
 
-            if 'dt' in ld[0]:
-                for t in set([d['dt'] for d in ld]):
-                    feat_group.create_group(t)
-                    create_datasets(feat_group[t])
+                dataset = '/'
+                if dataset not in datasets:
+                    dataset = d['dataset']
 
-                get_groups = lambda x: [feat_group['%s/%s' % (x['dt'], dt)]
-                                        for dt in ('inputs', 'labels',
-                                                   'durations')]
-            else:
-                get_groups = lambda x: [feat_group['%s' % (dt)] for dt in
-                                        ('inputs', 'labels', 'durations')]
-                create_datasets(feat_group)
+                # HDF5 pointers
+                inputs = f[dataset]['inputs']
+                labels = f[dataset]['labels']
+                durations = f[dataset]['durations']
 
-            for index, data in enumerate(ld):
+                # Data
+                input_ = feat_map(d['input'])
+                label = d['label']
+                duration = d['duration']
 
-                feats, labels, durations = get_groups(data)
-
-                audio_fname, label, duration = data['audio'], data['label'], data['duration']
-                feat = feat_map(audio_fname)
-
-                feats.resize(feats.shape[0] + 1, axis=0)
-                feats[feats.shape[0] - 1] = feat.flatten().astype('float32')
+                inputs.resize(inputs.shape[0] + 1, axis=0)
+                inputs[inputs.shape[0] - 1] = input_.flatten().astype('float32')
 
                 labels.resize(labels.shape[0] + 1, axis=0)
                 labels[labels.shape[0] - 1] = label.encode('utf8')
@@ -164,50 +156,12 @@ class DatasetParser(object):
                 durations[durations.shape[0] - 1] = duration
 
                 # Flush to disk only when it reaches 128 samples
-                if index % 128 == 0:
-                    self._logger.info('%d/%d done.' % (index, len(ld)))
+                if i % 128 == 0:
+                    self._logger.info('%d/%d done.' % (i, len(data)))
                     f.flush()
 
             f.flush()
-            self._logger.info('%d/%d done.' % (len(ld), len(ld)))
-
-    def read(self, method=None):
-        ''' Read dataset from disk (either json file or from directory) and
-        returns a list of dictionaries
-
-        Args:
-            method:
-                if `None` will try to read from json and disk (following this
-                order).
-                if `json` will try to read from json.
-                if `h5` will try to read from h5 file.
-                if `dir` will try to read from dataset directory
-        '''
-
-        if method not in [None, 'h5', 'json', 'dir']:
-            raise ValueError("method must be one of [None, 'h5', 'json', \
-                             'dir']")
-
-        if method is None:
-            if self.has_json:
-                return self._read_from_json()
-            else:
-                return self._read_from_dir()
-        elif method == 'json':
-            return self._read_from_json()
-        elif method == 'h5':
-            return self._read_from_h5()
-        elif method == 'dir':
-            return self._read_from_dir()
-
-    def _read_from_json(self):
-        return json.load(codecs.open(self.json_fname, 'r', encoding='utf8'))
-
-    def _read_from_h5(self):
-        return h5py.File(self.h5_fname, 'r')
-
-    def _read_from_dir(self):
-        return self._to_ld()
+            self._logger.info('%d/%d done.' % (len(data), len(data)))
 
     def _iter(self):
         raise NotImplementedError("_iter must be implemented")
@@ -219,10 +173,7 @@ class DatasetParser(object):
         if len(label) == 0:
             return False
 
-        if self.text_parser is None:
-            return True
-
-        return self.text_parser.is_valid(label)
+        return True
 
     @property
     def name(self):

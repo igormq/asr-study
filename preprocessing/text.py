@@ -102,7 +102,7 @@ class CharParser(BaseParser):
 
         return text
 
-    def is_valid(self, text, ignore_accents=True):
+    def is_valid(self, text):
         # verify if the text is valid without sanitization
         try:
             _ = self.map(text, sanitize=False)

@@ -86,7 +86,7 @@ class VoxForge(DatasetParser):
                     continue
 
                 yield {'duration': duration,
-                       'audio': audio_file,
+                       'input': audio_file,
                        'label': label,
                        'gender': gender,
                        'speaker': speaker_id}

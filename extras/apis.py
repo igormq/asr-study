@@ -1,8 +1,8 @@
 import os
 import speech_recognition as sr
 
-
 r = sr.Recognizer()
+
 
 def recognize_from_api(audio, api, name='API', safe=True, **kwargs):
     if not isinstance(audio, sr.AudioData):
