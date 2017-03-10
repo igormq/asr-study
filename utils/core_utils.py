@@ -74,18 +74,18 @@ def load_model(model_fname, return_meta=False, mode='train'):
                   model.get_layer('decoder').input[0])
 
         input_ = model.get_layer('inputs').input
-        input_length = model.get_layer('inputs_length').input
+        inputs_length = model.get_layer('inputs_length').input
 
         to_dense_layer = Lambda(
             layers_utils.to_dense,
             output_shape=layers_utils.to_dense_output_shape,
             name="to_dense")
 
-        y_pred = dec([y_pred, input_length])
+        y_pred = dec([y_pred, inputs_length])
 
         y_pred = to_dense_layer(y_pred)
 
-        model = Model(input=[input_, input_length],
+        model = Model(input=[input_, inputs_length],
                       output=[y_pred])
     elif mode == 'eval':
         dec_layer = model.get_layer('decoder')

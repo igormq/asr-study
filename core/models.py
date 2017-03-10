@@ -30,7 +30,7 @@ from .layers import recurrent
 
 def ctc_model(inputs, output, **kwargs):
     """ Given the input and output returns a model appending ctc_loss, the
-    decoder, labels, and input_length
+    decoder, labels, and inputs_length
 
     # Arguments
         see core.ctc_utils.layer_utils.decode for more arguments
