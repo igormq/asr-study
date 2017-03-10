@@ -16,7 +16,7 @@ class CSLU(DatasetParser):
 
         dataset_dir = dataset_dir or 'data/cslu'
 
-        super(CSLUSpoltechPort, self).__init__(dataset_dir, name, **kwargs)
+        super(CSLU, self).__init__(dataset_dir, name, **kwargs)
 
     def _iter(self):
         trans_directory = os.path.join(self.dataset_dir, 'trans')
