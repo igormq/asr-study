@@ -163,9 +163,10 @@ There are a plenty of work to be done. All contributions are welcome :).
 * Python 2.7
 * Numpy
 * Scipy
-* Pyyaml
+* Pyaml
 * HDF5
 * Codecs
+* Unidecode
 * Librosa
 * Inspect
 * Tensorflow

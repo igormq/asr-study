@@ -12,3 +12,4 @@ from datasets.lapsbm import LapsBM
 from datasets.voxforge import VoxForge
 from datasets.cslu import CSLU
 from datasets.dummy import Dummy
+from datasets.brsd import BRSD
