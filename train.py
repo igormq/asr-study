@@ -30,16 +30,16 @@ from keras.callbacks import ReduceLROnPlateau
 from core import metrics
 from core.ctc_utils import ctc_dummy_loss, decoder_dummy_loss
 from core.callbacks import MetaCheckpoint, ProgbarLogger
-from core.utils import setup_gpu
+from utils.core_utils import setup_gpu
 
 from preprocessing import audio, text
 
 from datasets.dataset_generator import DatasetGenerator
-from common.hparams import HParams
+from utils.hparams import HParams
 
-import common.utils as utils
+import utils.generic_utils as utils
 
-from core.utils import load_model
+from utils.core_utils import load_model
 
 if __name__ == '__main__':
 
@@ -49,16 +49,16 @@ if __name__ == '__main__':
     parser.add_argument('--load', default=None, type=str)
 
     # Model settings
-    parser.add_argument('--model', default='graves2006', type=str)
-    parser.add_argument('--model_params', default='{}', type=str)
+    parser.add_argument('--model', default='brsmv1', type=str)
+    parser.add_argument('--model_params', nargs='+', default=[])
 
     # Hyper parameters
     parser.add_argument('--num_epochs', default=100, type=int)
-    parser.add_argument('--lr', default=0.01, type=float)
+    parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--clipnorm', default=400, type=float)
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--opt', default='sgd', type=str,
+    parser.add_argument('--opt', default='adam', type=str,
                         choices=['sgd', 'adam'])
     # End of hyper parameters
 
@@ -66,19 +66,17 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', default=None, type=str, nargs='+')
 
     # Features generation (if necessary)
-    parser.add_argument('--feats', type=str, default=None)
-    parser.add_argument('--feats_params', type=str, default='{}')
+    parser.add_argument('--input_parser', type=str, default=None)
+    parser.add_argument('--input_parser_params', nargs='+', default=[])
 
     # Label generation (if necessary)
-    parser.add_argument('--text_parser', type=str,
+    parser.add_argument('--label_parser', type=str,
                         default='simple_char_parser')
-    parser.add_argument('--text_parser_params', type=str, default='{}')
+    parser.add_argument('--label_parser_params', nargs='+', default=[])
 
     # Callbacks
     parser.add_argument('--lr_schedule', default=None)
-    parser.add_argument('--lr_params',
-                        default="{'monitor': 'val_loss', \
-                        'factor':0.1, 'patience':5, 'min_lr':1e-6}")
+    parser.add_argument('--lr_params', nargs='+', default=[])
 
     # Other configs
     parser.add_argument('--save', default=None, type=str)
@@ -114,8 +112,7 @@ if __name__ == '__main__':
         model, meta = load_model(args.load, return_meta=True)
 
         logger.info('Loading parameters...')
-        args = HParams(
-            from_str=str(meta['training_args'])).update(vars(args_nondefault))
+        args = HParams(**meta['training_args']).update(vars(args_nondefault))
 
         epoch_offset = len(meta['epochs'])
         logger.info('Current epoch: %d' % epoch_offset)
@@ -129,7 +126,7 @@ if __name__ == '__main__':
         # Recovering all valid models
         model_fn = utils.get_from_module('core.models', args.model)
         # Loading model
-        model = model_fn(**utils.str2kwargs(args.model_params))
+        model = model_fn(**(HParams().parse(args.model_params).values()))
 
         logger.info('Setting the optimizer...')
         # Optimization
@@ -169,26 +166,26 @@ if __name__ == '__main__':
         lr_schedule_fn = utils.get_from_module('keras.callbacks',
                                                args.lr_schedule)
         if lr_schedule_fn:
-            lr_schedule = lr_schedule_fn(**utils.str2kwargs(args.lr_params))
+            lr_schedule = lr_schedule_fn(**HParams().parse(args.lr_params).values())
             callback_list.append(lr_schedule)
         else:
             raise ValueError('Learning rate schedule unrecognized')
 
     logger.info('Getting the feature extractor...')
     # Features extractor
-    feats_extractor = utils.get_from_module('preprocessing.audio',
-                                            args.feats,
-                                            args.feats_params)
+    input_parser = utils.get_from_module('preprocessing.audio',
+                                         args.input_parser,
+                                         params=args.input_parser_params)
 
     logger.info('Getting the text parser...')
     # Recovering text parser
-    text_parser = utils.get_from_module('preprocessing.text',
-                                        args.text_parser,
-                                        args.text_parser_params)
+    label_parser = utils.get_from_module('preprocessing.text',
+                                         args.label_parser,
+                                         params=args.label_parser_params)
 
     logger.info('Getting the data generator...')
     # Data generator
-    data_gen = DatasetGenerator(feats_extractor, text_parser,
+    data_gen = DatasetGenerator(input_parser, label_parser,
                                 batch_size=args.batch_size,
                                 seed=args.seed)
     # iterators over datasets
@@ -209,6 +206,8 @@ if __name__ == '__main__':
             test_flow = data_gen.flow_from_fname(args.dataset[2])
             num_test_samples = test_flow.len
 
+    logger.info(str(vars(args)))
+    print(str(vars(args)))
     logger.info('Initialzing training...')
     # Fit the model
     model.fit_generator(train_flow, samples_per_epoch=train_flow.len,
@@ -225,10 +224,12 @@ if __name__ == '__main__':
                                            max_q_size=10, nb_worker=1)
 
         msg = 'Total loss: %.4f\n\
-CTC Loss: %.4f\nLER: %.2f' % (metrics[0], metrics[1], metrics[3])
+CTC Loss: %.4f\nLER: %.2f%%' % (metrics[0], metrics[1], metrics[3]*100)
         logger.info(msg)
 
         with open(os.path.join(output_dir, 'results.txt'), 'w') as f:
             f.write(msg)
 
         print(msg)
+
+    K.clear_session()

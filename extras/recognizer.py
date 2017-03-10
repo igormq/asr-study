@@ -1,7 +1,8 @@
-# NOTE: this example requires PyAudio because it uses the Microphone class
-import sys
-sys.path.insert(0, "/home/igormq/repos/asr-study/keras")
+from __future__ import absolute_import, division, print_function
 
+# NOTE: this example requires PyAudio because it uses the Microphone class
+
+import sys
 import os
 import json
 import argparse
@@ -11,11 +12,10 @@ import numpy as np
 
 import speech_recognition as sr
 
-import common.utils as utils
-import common.apis as apis
-from common.dataset_generator import DatasetIterator
+import utils.generic_utils as utils
 
-from core.utils import setup_gpu
+from core.dataset_generator import DatasetIterator
+from utils.core_utils import setup_gpu
 
 import keras.backend as K
 from keras.models import Model
@@ -65,24 +65,24 @@ if __name__ == "__main__":
         training_args = meta['training_args']
 
         # Features extractor
-        feats_extractor = utils.get_from_module('preprocessing.audio',
-                                                training_args['feats'],
-                                                training_args['feats_params'])
+        input_parser = utils.get_from_module('preprocessing.audio',
+                                             training_args['feats'],
+                                             params=training_args['feats_params'])
 
         # Recovering text parser
-        text_parser = utils.get_from_module('preprocessing.text',
-                                            training_args['text_parser'],
-                                            training_args['text_parser_params']
+        label_parser = utils.get_from_module('preprocessing.text',
+                                             training_args['label_parser'],
+                                             params=training_args['label_parser_params']
                                             )
 
         data_it = DatasetIterator(np.array([f for a, f in audios]),
-                                  feature_extractor=feats_extractor,
-                                  text_parser=text_parser)
+                                  label_parser=input_parser,
+                                  label_parser=label_parser)
 
         model_predictions = model.predict_generator(
             data_it, val_samples=len(audios))
 
-        model_predictions = [text_parser.imap(p[:(np.argmax(p == -1) or len(p))]) for p in model_predictions]
+        model_predictions = [label_parser.imap(p[:(np.argmax(p == -1) or len(p))]) for p in model_predictions]
 
     for i, (audio, name) in enumerate(audios):
 

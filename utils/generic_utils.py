@@ -18,6 +18,7 @@ import yaml
 
 from .hparams import HParams
 
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,10 @@ def safe_mkdirs(path):
     return path
 
 
-def get_from_module(module, name, params=None):
-    members = inspect_module(module)
+def get_from_module(module, name, params=None, regex=False):
+    """ Get a class or method from a module given its name
+    """
+    members = inspect_module(module, regex=regex)
 
     if name is None or name.lower() == 'none':
         return None
@@ -49,16 +52,9 @@ def get_from_module(module, name, params=None):
 
     try:
         member = members[name.lower().strip()]
-
         # is a class and must be instantiate if params is not none
-        if (member and params) and inspect.isclass(member):
-            if type(params) is str:
-                return member(**str2kwargs(params))
-
-            if type(params) in (dict):
-                return member(**HParams(**params).values())
-
-            raise ValueError("params was not recognized.")
+        if (member and params is not None) and inspect.isclass(member):
+            return member(**HParams().parse(params).values())
 
         return member
     except KeyError, e:
@@ -66,10 +62,22 @@ def get_from_module(module, name, params=None):
                        (name, module, ', '.join(members.keys())))
 
 
-def inspect_module(module, to_dict=True):
-    members = inspect.getmembers(sys.modules[module], lambda member:
-                                 hasattr(member, '__module__') and
-                                 member.__module__ == module)
+def inspect_module(module, to_dict=True, regex=False):
+    modules = {}
+    if regex:
+        pattern = re.compile(module)
+        for key, value in sys.modules.items():
+            if pattern.match(key):
+                modules[key] = value
+    else:
+        modules = {module: sys.modules[module]}
+
+    members = []
+    for key, value in modules.items():
+        members.extend(inspect.getmembers(value, lambda member:
+                                          hasattr(member, '__module__') and
+                                          member.__module__ == key))
+
     if to_dict:
         return dict(members)
 
@@ -82,11 +90,6 @@ def ld2dl(ld):
         All dictionaries have the same keys
     '''
     return dict(zip(ld[0], zip(*[d.values() for d in ld])))
-
-
-def str2kwargs(string):
-    return HParams(from_str=string).values()
-
 
 def check_ext(fname, ext):
     # Adding dot
@@ -107,7 +110,7 @@ def parse_nondefault_args(args, default_args):
     args_nondefault = {k: v for k, v in vars(args).items()
                        if k not in args_default or args_default[k] != v}
 
-    args_nondefault = HParams(from_str=str(args_nondefault))
+    args_nondefault = HParams().parse(args_nondefault)
 
     return args_nondefault
 

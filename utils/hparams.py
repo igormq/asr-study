@@ -1,6 +1,5 @@
 import ast
 
-
 class HParams(object):
     """Creates an object for passing around hyperparameter values.
     Use the parse method to overwrite the default hyperparameters with values
@@ -12,13 +11,13 @@ class HParams(object):
       hparams.parse('{"hidden_size":512}')
       assert hparams.batch_size == 128
       assert hparams.hidden_size == 512
+
+
+      Code adpated from Google Magenta
     """
 
-    def __init__(self, from_str=None, **init_hparams):
+    def __init__(self, **init_hparams):
         object.__setattr__(self, 'keyvals', init_hparams)
-
-        if from_str:
-            self.parse(from_str)
 
     def __getitem__(self, key):
         """Returns value of the given hyperameter, or None if does not
@@ -46,9 +45,18 @@ class HParams(object):
 
         return self
 
-    def parse(self, values_string):
+    def parse(self, values):
         """Merges in new hyperparameters, replacing existing with same key."""
-        self.update(ast.literal_eval(values_string))
+
+        if type(values) == dict:
+            return self.update(values)
+
+        if type(values) in (set, list):
+            values = "{%s}" % ', '.join(["'%s':%s" % (k, v)
+                                         for k, v in zip(values[::2],
+                                                         values[1::2])])
+
+        self.update(ast.literal_eval(values))
 
         return self
 

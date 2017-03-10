@@ -6,20 +6,20 @@ import librosa
 import codecs
 
 
-class CSLUSpoltechPort(DatasetParser):
+class CSLU(DatasetParser):
     """ CSLU Spoltech Port dataset reader and parser
 
     More about the dataset: https://catalog.ldc.upenn.edu/LDC2006S16
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, dataset_dir=None, name='cslu', **kwargs):
 
-        kwargs.setdefault('name', 'cslu')
+        dataset_dir = dataset_dir or 'data/cslu'
 
-        super(CSLUSpoltechPort, self).__init__(**kwargs)
+        super(CSLUSpoltechPort, self).__init__(dataset_dir, name, **kwargs)
 
     def _iter(self):
-        trans_directory = os.path.join(self.dt_dir, 'trans')
+        trans_directory = os.path.join(self.dataset_dir, 'trans')
 
         for speaker_path in os.listdir(trans_directory):
 
@@ -37,7 +37,7 @@ class CSLUSpoltechPort(DatasetParser):
                     os.path.join(root_path, labels_file), 'r',
                     'latin-1').read().strip().lower()
 
-                audio_file = os.path.join(os.path.abspath(self.dt_dir),
+                audio_file = os.path.join(os.path.abspath(self.dataset_dir),
                                           'speech', speaker_path,
                                           labels_file[:-4])
 
@@ -48,12 +48,6 @@ class CSLUSpoltechPort(DatasetParser):
                     duration = librosa.audio.get_duration(filename=audio_file)
                 except IOError:
                     self._logger.error('File %s not found' % audio_file)
-                    continue
-
-                if not self._is_valid_label(label):
-                    self._logger.error(u'File %s has a forbidden label: "%s". \
-                                      Skipping' %
-                          (audio_file, label))
                     continue
 
                 yield {'duration': duration,

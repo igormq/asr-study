@@ -10,19 +10,20 @@ import numpy as np
 regex = r"Nome=(?P<name>.*)[\n]+Idade=(?P<age>.*)[\n]+.*[\n]+Sexo=(?P<gender>.*)[\n]+Escolaridade=(?P<education>.*)[\n]+"
 
 
-class Sidney(DatasetParser):
-    """ Sidney dataset reader and parser
+class Sid(DatasetParser):
+    """ Sid dataset reader and parser
     """
 
-    def __init__(self, **kwargs):
-        kwargs.setdefault('name', 'sidney')
+    def __init__(self, dataset_dir=None, name='sid', **kwargs):
 
-        super(Sidney, self).__init__(**kwargs)
+        dataset_dir = dataset_dir or 'data/sid'
+
+        super(Sid, self).__init__(dataset_dir, name, **kwargs)
 
     def _iter(self):
-        for speaker_path in os.listdir(self.dt_dir):
+        for speaker_path in os.listdir(self.dataset_dir):
 
-            root_path = os.path.join(os.path.abspath(self.dt_dir),
+            root_path = os.path.join(os.path.abspath(self.dataset_dir),
                                      speaker_path)
 
             if not os.path.isdir(os.path.join(root_path)):
@@ -65,11 +66,6 @@ class Sidney(DatasetParser):
                     self._logger.error('File %s not found' % audio_file)
                     continue
 
-                if not self._is_valid_label(label):
-                    self._logger.error(u'File %s has a forbidden label: "%s". \
-                                      Skipping', audio_file, label)
-                    continue
-
                 yield {'duration': duration,
                        'input': audio_file,
                        'label': label,
@@ -96,7 +92,7 @@ class Sidney(DatasetParser):
 
 
 if __name__ == '__main__':
-    """ Script to fix some errors in sidney dataset about the name convention
+    """ Script to fix some errors in sid dataset about the name convention
     on folder and some errors in transcription
     """
     parser = argparse.ArgumentParser()

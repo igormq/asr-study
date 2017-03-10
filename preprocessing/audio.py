@@ -451,8 +451,11 @@ class Raw(Feature):
         super(Raw, self).__init__(**kwargs)
         self._num_feats = None
 
-    def _call(self, signal):
-        return signal
+    def _call(self, x):
+        return x
+
+    def _postprocessing(self, x):
+        return x
 
     def __str__(self):
         return "raw"

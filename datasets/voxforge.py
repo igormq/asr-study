@@ -19,25 +19,25 @@ class VoxForge(DatasetParser):
                     'ThiagoCastro-20131129-qpn',
                     'anonymous-20131016-uzv']
 
-    def __init__(self, **kwargs):
+    def __init__(self, dataset_dir=None, name='voxforge', **kwargs):
 
-        kwargs.setdefault('name', 'voxforge')
+        dataset_dir = dataset_dir or 'data/voxforge'
 
-        super(VoxForge, self).__init__(**kwargs)
+        super(VoxForge, self).__init__(dataset_dir, name, **kwargs)
 
-        if (self.dt_dir is not None and
-            os.path.isdir(os.path.join(self.dt_dir, 'files'))):
+        if (self.dataset_dir is not None and
+            os.path.isdir(os.path.join(self.dataset_dir, 'files'))):
 
-            self.dt_dir = os.path.join(self.dt_dir, 'files')
+            self.dataset_dir = os.path.join(self.dataset_dir, 'files')
 
     def _iter(self):
-        for speaker_path in os.listdir(self.dt_dir):
+        for speaker_path in os.listdir(self.dataset_dir):
 
             if speaker_path in self.IGNORED_LIST:
                 continue
 
             root_path = os.path.join(
-                os.path.abspath(self.dt_dir), speaker_path)
+                os.path.abspath(self.dataset_dir), speaker_path)
 
             if not os.path.isdir(os.path.join(root_path)):
                 continue
@@ -77,12 +77,6 @@ class VoxForge(DatasetParser):
                     duration = librosa.audio.get_duration(filename=audio_file)
                 except IOError:
                     self._logger.error('File %s not found' % audio_file)
-                    continue
-
-                if not self._is_valid_label(label):
-                    self._logger.error(u'File %s has a forbidden label: "%s". \
-                                      Skipping'
-                          % (audio_file, label))
                     continue
 
                 yield {'duration': duration,

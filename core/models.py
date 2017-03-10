@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import core.ctc_utils as ctc_utils
-from common.hparams import HParams
+from utils.hparams import HParams
 
 import keras
 import keras.backend as K
@@ -28,9 +28,9 @@ from keras.regularizers import l1, l2, l1l2
 from .layers import recurrent
 
 
-def ctc_model(input_, output, **kwargs):
-    """ Given the input and output returns a model appending ctc_loss and the
-    decoder
+def ctc_model(inputs, output, **kwargs):
+    """ Given the input and output returns a model appending ctc_loss, the
+    decoder, labels, and input_length
 
     # Arguments
         see core.ctc_utils.layer_utils.decode for more arguments
@@ -38,18 +38,18 @@ def ctc_model(input_, output, **kwargs):
 
     # Define placeholders
     labels = Input(name='labels', shape=(None,), dtype='int32', sparse=True)
-    input_length = Input(name='input_length', shape=(None,), dtype='int32')
+    inputs_length = Input(name='inputs_length', shape=(None,), dtype='int32')
 
     # Define a decoder
     dec = Lambda(ctc_utils.decode, output_shape=ctc_utils.decode_output_shape,
                  arguments={'is_greedy': True}, name='decoder')
-    y_pred = dec([output, input_length])
+    y_pred = dec([output, inputs_length])
 
     ctc = Lambda(ctc_utils.ctc_lambda_func, output_shape=(1,), name="ctc")
     # Define loss as a layer
-    loss = ctc([output, labels, input_length])
+    loss = ctc([output, labels, inputs_length])
 
-    return Model(input=[input_, labels, input_length], output=[loss, y_pred])
+    return Model(input=[inputs, labels, inputs_length], output=[loss, y_pred])
 
 
 def graves2006(num_features=26, num_hiddens=100, num_classes=28, std=.6):
@@ -61,7 +61,7 @@ def graves2006(num_features=26, num_hiddens=100, num_classes=28, std=.6):
         ACM, 2006.
     """
 
-    x = Input(name='input', shape=(None, num_features))
+    x = Input(name='inputs', shape=(None, num_features))
     o = x
 
     o = GaussianNoise(std)(o)
@@ -84,7 +84,7 @@ def eyben(num_features=39, num_hiddens=[78, 120, 27], num_classes=28):
 
     assert len(num_hiddens) == 3
 
-    x = Input(name='input', shape=(None, num_features))
+    x = Input(name='inputs', shape=(None, num_features))
     o = x
 
     if num_hiddens[0]:
@@ -103,144 +103,44 @@ def eyben(num_features=39, num_hiddens=[78, 120, 27], num_classes=28):
     return ctc_model(x, o)
 
 
-def bayesian_lstm(num_features=39, num_classes=28,
-                  num_hiddens=256, num_layers=3, dropout=0.25,
-                  input_dropout=False, weight_decay=1e-4):
-    """ LSTM with variational dropout and weight decay. Following the best
-    topology of [2] (without a transducer).
-    Note:
-        Dropout is tied through layers, and weights and the same for weight
-        decay, minimizing the number of hyper parameters
+def maas(num_features=81, num_classes=29, num_hiddens=1824, dropout=0.1,
+         max_value=20):
+    """ Maas' model.
     Reference:
-        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in
-        Recurrent Neural Networks", 2015.
-        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech
-        recognition with deep recurrent neural networks", 2013.
+        [1] Maas, Andrew L., et al. "Lexicon-Free Conversational Speech
+        Recognition with Neural Networks." HLT-NAACL. 2015.
     """
 
-    x = Input(name='input', shape=(None, num_features))
+    x = Input(name='inputs', shape=(None, num_features))
     o = x
 
-    if input_dropout:
-        o = Dropout(dropout)(o)
+    def clipped_relu(x):
+        return relu(x, max_value=max_value)
 
-    for _ in range(num_layers):
-        o = Bidirectional(LSTM(num_hiddens,
-                          return_sequences=True,
-                          W_regularizer=l2(weight_decay),
-                          U_regularizer=l2(weight_decay),
-                          dropout_W=dropout,
-                          dropout_U=dropout,
-                          consume_less='gpu'))(o)
+    # First layer
+    o = TimeDistributed(Dense(num_hiddens))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
 
-    o = TimeDistributed(Dense(num_classes,
-                              W_regularizer=l2(weight_decay)))(o)
+    # Second layer
+    o = TimeDistributed(Dense(num_hiddens))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
 
-    return ctc_model(x, o)
+    # Third layer
+    o = Bidirectional(SimpleRNN(num_hiddens, return_sequences=True,
+                                dropout_W=dropout,
+                                activation=clipped_relu,
+                                init='he_normal'), merge_mode='sum')(o)
 
+    # Fourth layer
+    o = TimeDistributed(Dense(num_hiddens))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
 
-def zoneout_rnn(num_features=39, num_classes=28, num_hiddens=256, num_layers=3,
-                dropout=0., zoneout=0.2, input_dropout=False,
-                input_std_noise=.0, weight_decay=1e-4, model='lstm'):
-    """ LSTM/GRU with variational dropout, weight decay and zoneout. Following the
-    best topology of [2] (without a transducer).
-    Note:
-        Dropout, zoneout and weight decay are tied through layers, minimizing
-        the number of hyper parameters
-    Reference:
-        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in
-        Recurrent Neural Networks", 2015.
-        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech
-        recognition with deep recurrent neural networks", 2013.
-        [3] Krueger, David, et al. "Zoneout: Regularizing rnns by randomly
-        preserving hidden activations", 2016.
-    """
+    # Fifth layer
+    o = TimeDistributed(Dense(num_hiddens))(o)
+    o = TimeDistributed(Activation(clipped_relu))(o)
 
-    x = Input(name='input', shape=(None, num_features))
-    o = x
-
-    if input_std_noise is not None:
-        o = GaussianNoise(input_std_noise)(o)
-
-    if input_dropout:
-        o = Dropout(dropout)(o)
-
-    for _ in range(num_layers):
-        o = Bidirectional(recurrent(num_hiddens,
-                                    model=model,
-                                    return_sequences=True,
-                                    regularizer=l2(weight_decay),
-                                    dropout=dropout,
-                                    zoneout=zoneout))(o)
-
-    o = TimeDistributed(Dense(num_classes,
-                              W_regularizer=l2(weight_decay)))(o)
-
-    return ctc_model(x, o)
-
-
-def imlstm(num_features=120, num_classes=28, num_hiddens=320, num_layers=4,
-           dropout=0., zoneout=0., input_dropout=False, input_std_noise=.0,
-           weight_decay=1e-4, res_con=False, ln=None, mi=None,
-           activation='tanh'):
-    """ Improved LSTM:
-        * Residual connection
-        * Variational Dropout
-        * Zoneout
-        * Layer Normalization
-        * Multiplicative Integration
-    Note:
-        Dropout, zoneout and weight decay is tied through layers, in order to
-        minimizing the number of hyper parameters
-    Reference:
-        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in
-        Recurrent Neural Networks", 2015.
-        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech
-        recognition with deep recurrent neural networks", 2013.
-        [3] Krueger, David, et al. "Zoneout: Regularizing rnns by randomly
-        preserving hidden activations", 2016.
-        [4] Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E. Hinton. "Layer
-        normalization.", 2016.
-        [5] Wu, Yuhuai, et al. "On multiplicative integration with recurrent
-        neural networks." Advances In Neural Information Processing Systems.
-        2016.
-        [6] Wu, Yonghui, et al. "Google's Neural Machine Translation System:
-        Bridging the Gap between Human and Machine Translation.", 2016.
-    """
-
-    x = Input(name='input', shape=(None, num_features))
-    o = x
-
-    if input_std_noise is not None:
-        o = GaussianNoise(input_std_noise)(o)
-
-    if res_con:
-        o = TimeDistributed(Dense(num_hiddens*2,
-                                  W_regularizer=l2(weight_decay)))(o)
-
-    if input_dropout:
-        o = Dropout(dropout)(o)
-
-    for i, _ in enumerate(range(num_layers)):
-        new_o = Bidirectional(LSTM(num_hiddens,
-                                   return_sequences=True,
-                                   W_regularizer=l2(weight_decay),
-                                   U_regularizer=l2(weight_decay),
-                                   dropout_W=dropout,
-                                   dropout_U=dropout,
-                                   zoneout_c=zoneout,
-                                   zoneout_h=zoneout,
-                                   mi=mi,
-                                   ln=ln,
-                                   activation=activation))(o)
-
-        if res_con:
-            o = merge([new_o,  o], mode='sum')
-        else:
-            o = new_o
-
-    o = TimeDistributed(Dense(num_classes,
-                              W_regularizer=l2(weight_decay)))(o)
+    # Output layer
+    o = TimeDistributed(Dense(num_classes))(o)
 
     return ctc_model(x, o)
 
@@ -275,7 +175,7 @@ def deep_speech(num_features=81, num_classes=29, num_hiddens=2048, dropout=0.1,
         [1] HANNUN, A. Y. et al. Deep Speech: Scaling up end-to-end speech
         recognition. arXiV, 2014.
     """
-    x = Input(name='input', shape=(None, num_features))
+    x = Input(name='inputs', shape=(None, num_features))
     o = x
 
     def clipped_relu(x):
@@ -314,43 +214,68 @@ def deep_speech(num_features=81, num_classes=29, num_hiddens=2048, dropout=0.1,
     return ctc_model(x, o)
 
 
-def maas(num_features=81, num_classes=29, num_hiddens=1824, dropout=0.1,
-         max_value=20):
-    """ Maas' model.
+def brsmv1(num_features=39, num_classes=28, num_hiddens=256, num_layers=5,
+           dropout=0.2, zoneout=0., input_dropout=False,
+           input_std_noise=.0, weight_decay=1e-4, residual=None, ln=None,
+           mi=None, activation='tanh'):
+    """ BRSM v1.0
+    Improved features:
+        * Residual connection
+        * Variational Dropout
+        * Zoneout
+        * Layer Normalization
+        * Multiplicative Integration
+    Note:
+        Dropout, zoneout and weight decay is tied through layers, in order to
+        minimizing the number of hyper parameters
     Reference:
-        [1] Maas, Andrew L., et al. "Lexicon-Free Conversational Speech
-        Recognition with Neural Networks." HLT-NAACL. 2015.
+        [1] Gal, Y, "A Theoretically Grounded Application of Dropout in
+        Recurrent Neural Networks", 2015.
+        [2] Graves, Alex, Abdel-rahman Mohamed, and Geoffrey Hinton. "Speech
+        recognition with deep recurrent neural networks", 2013.
+        [3] Krueger, David, et al. "Zoneout: Regularizing rnns by randomly
+        preserving hidden activations", 2016.
+        [4] Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E. Hinton. "Layer
+        normalization.", 2016.
+        [5] Wu, Yuhuai, et al. "On multiplicative integration with recurrent
+        neural networks." Advances In Neural Information Processing Systems.
+        2016.
+        [6] Wu, Yonghui, et al. "Google's Neural Machine Translation System:
+        Bridging the Gap between Human and Machine Translation.", 2016.
     """
 
-    x = Input(name='input', shape=(None, num_features))
+    x = Input(name='inputs', shape=(None, num_features))
     o = x
 
-    def clipped_relu(x):
-        return relu(x, max_value=max_value)
+    if input_std_noise is not None:
+        o = GaussianNoise(input_std_noise)(o)
 
-    # First layer
-    o = TimeDistributed(Dense(num_hiddens))(o)
-    o = TimeDistributed(Activation(clipped_relu))(o)
+    if residual is not None:
+        o = TimeDistributed(Dense(num_hiddens*2,
+                                  W_regularizer=l2(weight_decay)))(o)
 
-    # Second layer
-    o = TimeDistributed(Dense(num_hiddens))(o)
-    o = TimeDistributed(Activation(clipped_relu))(o)
+    if input_dropout:
+        o = Dropout(dropout)(o)
 
-    # Third layer
-    o = Bidirectional(SimpleRNN(num_hiddens, return_sequences=True,
-                                dropout_W=dropout,
-                                activation=clipped_relu,
-                                init='he_normal'), merge_mode='sum')(o)
+    for i, _ in enumerate(range(num_layers)):
+        new_o = Bidirectional(LSTM(num_hiddens,
+                                   return_sequences=True,
+                                   W_regularizer=l2(weight_decay),
+                                   U_regularizer=l2(weight_decay),
+                                   dropout_W=dropout,
+                                   dropout_U=dropout,
+                                   zoneout_c=zoneout,
+                                   zoneout_h=zoneout,
+                                   mi=mi,
+                                   ln=ln,
+                                   activation=activation))(o)
 
-    # Fourth layer
-    o = TimeDistributed(Dense(num_hiddens))(o)
-    o = TimeDistributed(Activation(clipped_relu))(o)
+        if residual is not None:
+            o = merge([new_o,  o], mode=residual)
+        else:
+            o = new_o
 
-    # Fifth layer
-    o = TimeDistributed(Dense(num_hiddens))(o)
-    o = TimeDistributed(Activation(clipped_relu))(o)
-
-    # Output layer
-    o = TimeDistributed(Dense(num_classes))(o)
+    o = TimeDistributed(Dense(num_classes,
+                              W_regularizer=l2(weight_decay)))(o)
 
     return ctc_model(x, o)

@@ -2,24 +2,24 @@ version: 1
 disable_existing_loggers: False
 formatters:
     complete:
-        format: "%(savename)s (asctime)s %(name)-12s %(levelname)-8s %(message)s"
+        format: "%(name)-12s: (asctime)s %(name)-12s %(levelname)-8s %(message)s"
         datefmt: "%m-%d %H:%M"
     simple:
         format: "%(name)-12s: %(levelname)-8s %(message)s"
 handlers:
     console:
         class: logging.StreamHandler
-        level: DEBUG
+        level: WARNING
         formatter: simple
         stream: ext://sys.stdout
-    error_file_handler:
+    file_handler:
         class: logging.handlers.RotatingFileHandler
-        level: ERROR
+        level: INFO
         formatter: complete
-        filename: errors.log
+        filename: info.log
         maxBytes: 10485760 # 10MB
         backupCount: 20
         encoding: utf8
 root:
-    level: WARNING
-    handlers: [console, error_file_handler]
+    level: INFO
+    handlers: [console, file_handler]

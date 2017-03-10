@@ -24,9 +24,10 @@ class Dummy(DatasetParser):
         (train, valid and test) given the proportions
     """
 
-    def __init__(self, num_speakers=10, num_utterances_per_speaker=10,
+    def __init__(self, dataset_dir=None, num_speakers=10,
+                 num_utterances_per_speaker=10,
                  max_duration=10.0, min_duration=1.0, max_label_length=200,
-                 fs=16e3, split=None, **kwargs):
+                 fs=16e3, split=None, name='dummy', **kwargs):
         '''
         Args:
             split: list or nparray of size 2 that splits the data between
@@ -34,9 +35,7 @@ class Dummy(DatasetParser):
             valid and 5% test
         '''
 
-        kwargs.setdefault('name', 'dummy')
-
-        super(Dummy, self).__init__(**kwargs)
+        super(Dummy, self).__init__(None, name, **kwargs)
 
         self.num_speakers = num_speakers
         self.num_utterances_per_speaker = num_utterances_per_speaker
@@ -48,6 +47,15 @@ class Dummy(DatasetParser):
 
         if split is not None and (len(split) != 2 or np.sum(split) > 1.):
             raise ValueError('Split must have len = 2 and must sum <= 1')
+
+    @property
+    def dataset_dir(self):
+        """Filepath to the dataset directory"""
+        return self._dataset_dir
+
+    @dataset_dir.setter
+    def dataset_dir(self, value):
+        self._dataset_dir = value
 
     def _iter(self):
 

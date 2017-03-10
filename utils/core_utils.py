@@ -2,6 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import h5py
+import yaml
+
 import keras
 import keras.backend as K
 from keras.models import Model
@@ -9,11 +12,11 @@ from keras.layers import Lambda
 import tensorflow as tf
 
 import core
-from . import layers_utils
-from . import ctc_utils
-from . import metrics
+from core import layers_utils
+from core import ctc_utils
+from core import metrics
 
-from common.utils import inspect_module
+from utils.generic_utils import inspect_module
 
 
 def setup_gpu(gpu, allow_growth=False, log_device_placement=False):
@@ -70,8 +73,8 @@ def load_model(model_fname, return_meta=False, mode='train'):
         y_pred = (model.get_layer('y_pred') or
                   model.get_layer('decoder').input[0])
 
-        input_ = model.get_layer('input').input
-        input_length = model.get_layer('input_length').input
+        input_ = model.get_layer('inputs').input
+        input_length = model.get_layer('inputs_length').input
 
         to_dense_layer = Lambda(
             layers_utils.to_dense,

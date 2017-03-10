@@ -17,7 +17,7 @@ from .layers_utils import zoneout
 
 from .initializers import k_init
 
-import warnings
+import logging
 
 
 class LayerNormalization(Layer):
@@ -56,6 +56,8 @@ class LayerNormalization(Layer):
         self.gain_init = initializations.get(gain_init)
         self.bias_init = initializations.get(bias_init)
         self.initial_weights = weights
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
 
         super(LayerNormalization, self).__init__(**kwargs)
 
@@ -154,14 +156,16 @@ class RHN(Recurrent):
         self.b_regularizer = regularizers.get(b_regularizer)
         self.dropout_W, self.dropout_U = dropout_W, dropout_U
 
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
+
         if self.dropout_W or self.dropout_U:
             self.uses_learning_phase = True
 
         super(RHN, self).__init__(**kwargs)
 
         if not self.consume_less == "gpu":
-            warnings.warn("Ignoring consume_less=%s. Setting to 'gpu'." %
-                          self.consume_less)
+            self._logger.warning("Ignoring consume_less=%s. Setting to 'gpu'." % self.consume_less)
 
     def build(self, input_shape):
         self.input_spec = [InputSpec(shape=input_shape)]
@@ -363,6 +367,9 @@ class LSTM(keras_layers.LSTM):
 
         super(LSTM, self).__init__(output_dim, **kwargs)
 
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
+
         self.ln = ln
         self.mi = mi
 
@@ -373,7 +380,7 @@ class LSTM(keras_layers.LSTM):
             self.uses_learning_phase = True
 
         if self.consume_less != 'gpu':
-            warnings.warn("Invalid option for `consume_less`. Falling back \
+            self._logger.warn("Invalid option for `consume_less`. Falling back \
 to option `gpu`.")
             self.consume_less = 'gpu'
 
