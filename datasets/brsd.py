@@ -6,6 +6,8 @@ import re
 import librosa
 import codecs
 
+from utils.generic_utils import get_from_module
+
 
 class BRSD(DatasetParser):
     """ Brazilian Portuguese Speech dataset reader and parser
