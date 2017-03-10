@@ -77,7 +77,7 @@ class BRSD(DatasetParser):
                            'speaker': '%s_%s' % (str(dataset), d['speaker']),
                            'dataset': 'train'}
             except ValueError, e:
-                print('Skipping dataset %s: %s' (name, e))
+                print('Skipping dataset %s: %s' % (name, e.message))
         # Test and valid set
         lapsbm = LapsBM(dataset_dir=self.dataset_dir['lapsbm'], split=True)
         for d in lapsbm._iter():
