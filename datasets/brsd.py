@@ -72,7 +72,7 @@ class BRSD(DatasetParser):
 
                 for d in dataset._iter():
                     yield {'duration': d['duration'],
-                           'input': d['audio'],
+                           'input': d['input'],
                            'label': d['label'],
                            'speaker': '%s_%s' % (str(dataset), d['speaker']),
                            'dataset': 'train'}
@@ -82,7 +82,7 @@ class BRSD(DatasetParser):
         lapsbm = LapsBM(dataset_dir=self.dataset_dir['lapsbm'], split=True)
         for d in lapsbm._iter():
             yield {'duration': d['duration'],
-                   'input': d['audio'],
+                   'input': d['input'],
                    'label': d['label'],
                    'speaker': '%s_%s' % (str(dataset), d['speaker']),
                    'dataset': d['dataset']}
@@ -91,7 +91,7 @@ class BRSD(DatasetParser):
         report = '''General information:
            Number of utterances: %d
            Total size (in seconds) of utterances: %.f
-           Number of speakers: %d''' % (len(dl['audio']),
+           Number of speakers: %d''' % (len(dl['input']),
                                         sum(dl['duration']),
                                         len(set(dl['speaker'])))
 
