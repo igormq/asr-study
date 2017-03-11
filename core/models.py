@@ -216,8 +216,8 @@ def deep_speech(num_features=81, num_classes=29, num_hiddens=2048, dropout=0.1,
 
 def brsmv1(num_features=39, num_classes=28, num_hiddens=256, num_layers=5,
            dropout=0.2, zoneout=0., input_dropout=False,
-           input_std_noise=.0, weight_decay=1e-4, residual=None, ln=None,
-           mi=None, activation='tanh'):
+           input_std_noise=.0, weight_decay=1e-4, residual=None,
+           layer_norm=None, mi=None, activation='tanh'):
     """ BRSM v1.0
     Improved features:
         * Residual connection
@@ -267,7 +267,7 @@ def brsmv1(num_features=39, num_classes=28, num_hiddens=256, num_layers=5,
                                    zoneout_c=zoneout,
                                    zoneout_h=zoneout,
                                    mi=mi,
-                                   ln=ln,
+                                   layer_norm=layer_norm,
                                    activation=activation))(o)
 
         if residual is not None:
