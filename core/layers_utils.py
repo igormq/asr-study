@@ -14,9 +14,8 @@ def highway_bias_initializer(shape, name=None):
 
 
 def layer_normalization(x, gain, bias, epsilon=1e-5):
-    m = K.mean(x, axis=-1, keepdims=True)
-    std = K.sqrt(K.var(x, axis=-1, keepdims=True) + epsilon)
-    x_normed = (x - m) / std * gain + bias
+    mean, std = tf.nn.moments(x, [1], keep_dims=True)
+    x_normed = (x - mean) / K.sqrt(std + epsilon) * gain + bias
     return x_normed
 
 
