@@ -5,7 +5,7 @@ This repository contains my efforts on developing an end-to-end ASR system using
 
 Our model was trained using four datasets: [CSLU Spoltech (LDC2006S16)](https://catalog.ldc.upenn.edu/LDC2006S16), Sid, [VoxForge](http://www.voxforge.org), and [LapsBM1.4]( http://www.laps.ufpa.br/falabrasil/). Only the CSLU dataset is paid.
 
-#### Set up the (partial) Brazilian Portuguese Speech Dataset (BPSD)
+#### Set up the (partial) Brazilian Portuguese Speech Dataset (BRSD)
 
 You can download the freely available datasets with the provided script (it may take a while):
 
@@ -42,10 +42,11 @@ Also, you can evaluate the model against the **brsd** test set
 $ python eval.py --model models/brsmv1.h5 --dataset .datasets/brsd/data.h5
 ```
 
-#### Best results
+#### brsmv1.h5 training
+
 <div align=center>
-  <img src='imgs/best_loss.jpg' style='width: 450px'/>
-  <img src='imgs/best_ler.jpg' style='width: 450px'/>
+  <img src='imgs/best_loss.jpg' height='300px'/>
+  <img src='imgs/best_ler.jpg' height='300px'/>
 </div>
 
 Test set: LER **25.13%** (using beam search decoder with beam width of 100)
