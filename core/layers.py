@@ -10,7 +10,7 @@ from keras.layers.recurrent import Recurrent
 from keras.engine import Layer, InputSpec
 
 from .layers_utils import highway_bias_initializer
-from .layers_utils import layer_normalization as LN
+from .layers_utils import layer_normalization
 from .layers_utils import multiplicative_integration_init
 from .layers_utils import multiplicative_integration
 from .layers_utils import zoneout
@@ -363,14 +363,14 @@ class LSTM(keras_layers.LSTM):
         - [Zoneout: Regularizing RNNs by Randomly Preserving Hidden Activations](https://arxiv.org/abs/1606.01305)
     """
     def __init__(self, output_dim, zoneout_h=0., zoneout_c=0.,
-                 ln=None, mi=None, **kwargs):
+                 layer_norm=None, mi=None, **kwargs):
 
         super(LSTM, self).__init__(output_dim, **kwargs)
 
         self._logger = logging.getLogger('%s.%s' % (__name__,
                                                     self.__class__.__name__))
 
-        self.ln = ln
+        self.layer_norm = layer_norm
         self.mi = mi
 
         self.zoneout_c = zoneout_c
@@ -403,35 +403,29 @@ to option `gpu`.")
                 initializer=k_init(beta2_init),
                 name='{}_mi_beta2'.format(self.name))
 
-        if self.ln is not None:
+        if self.layer_norm is not None:
             ln_gain_init, ln_bias_init = self.ln
 
-            self.ln_gain_x = self.add_weight(
-                (4 * self.output_dim, ),
-                initializer=k_init(ln_gain_init),
-                name='{}_ln_gain_x'.format(self.name))
-            self.ln_bias_x = self.add_weight(
-                (4 * self.output_dim, ),
-                initializer=k_init(ln_bias_init),
-                name='{}_ln_bias_x'.format(self.name))
+            self.layer_norm_params = {}
 
-            self.ln_gain_h = self.add_weight(
-                (4 * self.output_dim, ),
-                initializer=k_init(ln_gain_init),
-                name='{}_ln_gain_h'.format(self.name))
-            self.ln_bias_h = self.add_weight(
-                (4 * self.output_dim, ),
-                initializer=k_init(ln_bias_init),
-                name='{}_ln_bias_h'.format(self.name))
+            for n in {'i', 'f', 'c', 'o', 'new_c'}:
 
-            # self.ln_gain_c = self.add_weight(
-            #    (self.output_dim, ),
-            #    initializer=ln_gain_init,
-            #    name='{}_ln_gain_c'.format(self.name))
-            # self.ln_bias_c = self.add_weight(
-            #    (self.output_dim, ),
-            #    initializer=ln_bias_init,
-            #    name='{}_ln_bias_c'.format(self.name))
+                gain = self.add_weight(
+                    (self.output_dim, ),
+                    initializer=k_init(ln_gain_init),
+                    name='%s_ln_gain_%s' % (self.name, n))
+                bias = self.add_weight(
+                    (self.output_dim, ),
+                    initializer=k_init(ln_bias_init),
+                    name='%s_ln_bias_%s' % (self.name, n))
+
+                self.layer_norm_params[n] = [gain, bias]
+
+    def _layer_norm(self, x, *args):
+        if self.layer_norm is not None:
+            return layer_normalization(x, *args)
+
+        return x
 
     def step(self, x, states):
         h_tm1 = states[0]
@@ -452,10 +446,14 @@ to option `gpu`.")
         else:
             z = Wx + Uh + self.b
 
-        z0 = z[:, :self.output_dim]
-        z1 = z[:, self.output_dim: 2 * self.output_dim]
-        z2 = z[:, 2 * self.output_dim: 3 * self.output_dim]
-        z3 = z[:, 3 * self.output_dim:]
+        z0 = self._layer_norm(z[:, :self.output_dim],
+                              *self.layer_norm_params['i'])
+        z1 = self._layer_norm(z[:, self.output_dim: 2 * self.output_dim],
+                              *self.layer_norm_params['f'])
+        z2 = self._layer_norm(z[:, 2 * self.output_dim: 3 * self.output_dim],
+                              *self.layer_norm_params['c'])
+        z3 = self._layer_norm(z[:, 3 * self.output_dim:],
+                              *self.layer_norm_params['o'])
 
         i = self.inner_activation(z0)
         f = self.inner_activation(z1)
@@ -465,12 +463,11 @@ to option `gpu`.")
         if 0 < self.zoneout_c < 1:
             c = zoneout(self.zoneout_c, c_tm1, c,
                         noise_shape=(self.output_dim,))
-        c_ln = c
-        # this is returning a lot of Nan
-        # if self.ln:
-        #    c_ln = LN(c, self.ln_gain_c, self.ln_bias_c)
 
-        h = o * self.activation(c_ln)
+        # this is returning a lot of nan
+        new_c = self._layer_norm(c, *self.layer_norm_params['new_c'])
+
+        h = o * self.activation(new_c)
         if 0 < self.zoneout_h < 1:
             h = zoneout(self.zoneout_h, h_tm1, h,
                         noise_shape=(self.output_dim,))
@@ -478,7 +475,7 @@ to option `gpu`.")
         return h, [h, c]
 
     def get_config(self):
-        config = {'ln': self.ln,
+        config = {'layer_norm': self.layer_norm,
                   'mi': self.mi,
                   'zoneout_h': self.zoneout_h,
                   'zoneout_c': self.zoneout_c
