@@ -53,8 +53,7 @@ class DatasetParser(object):
                     raise KeyError("__loop must return a dict with %s key" % k)
 
             if not self._is_valid_label(d['label'], label_parser=label_parser):
-                self._logger.error(u'File %s has a forbidden label: "%s". \
-                                  Skipping', d['input'], d['label'])
+                self._logger.warning(u'File %s has a forbidden label: "%s". Skipping', d['input'], d['label'])
                 continue
 
             data.append(d)
