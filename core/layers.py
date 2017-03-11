@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import numpy as np
 
 import keras.backend as K
+import tensorflow as tf
 
 from keras import activations, initializations, regularizers
 import keras.layers as keras_layers
@@ -407,25 +408,24 @@ to option `gpu`.")
             ln_gain_init, ln_bias_init = self.layer_norm
 
             self.layer_norm_params = {}
-
-            for n in {'i', 'f', 'c', 'o', 'new_c'}:
+            for n, i in {'Uh': 4, 'Wx': 4, 'new_c': 1}.items():
 
                 gain = self.add_weight(
-                    (self.output_dim, ),
+                    (i*self.output_dim, ),
                     initializer=k_init(ln_gain_init),
                     name='%s_ln_gain_%s' % (self.name, n))
                 bias = self.add_weight(
-                    (self.output_dim, ),
+                    (i*self.output_dim, ),
                     initializer=k_init(ln_bias_init),
                     name='%s_ln_bias_%s' % (self.name, n))
 
                 self.layer_norm_params[n] = [gain, bias]
 
-    def _layer_norm(self, x, *args):
-        if self.layer_norm is not None:
-            return layer_normalization(x, *args)
+    def _layer_norm(self, x, gain, bias):
+        if self.layer_norm is None:
+            return x
 
-        return x
+        return layer_normalization(x, gain, bias)
 
     def step(self, x, states):
         h_tm1 = states[0]
@@ -433,12 +433,10 @@ to option `gpu`.")
         B_U = states[2]
         B_W = states[3]
 
-        Uh = K.dot(h_tm1 * B_U[0], self.U)
-        Wx = K.dot(x * B_W[0], self.W)
-
-        if self.ln is not None:
-            Uh = LN(Uh, self.ln_gain_h, self.ln_bias_h)
-            Wx = LN(Wx, self.ln_gain_x, self.ln_bias_x)
+        Uh = self._layer_norm(K.dot(h_tm1 * B_U[0], self.U),
+                              *self.layer_norm_params['Uh'])
+        Wx = self._layer_norm(K.dot(x * B_W[0], self.W),
+                              *self.layer_norm_params['Wx'])
 
         if self.mi is not None:
             z = self.mi_alpha * Wx * Uh + self.mi_beta1 * Uh + \
@@ -446,19 +444,15 @@ to option `gpu`.")
         else:
             z = Wx + Uh + self.b
 
-        z0 = self._layer_norm(z[:, :self.output_dim],
-                              *self.layer_norm_params['i'])
-        z1 = self._layer_norm(z[:, self.output_dim: 2 * self.output_dim],
-                              *self.layer_norm_params['f'])
-        z2 = self._layer_norm(z[:, 2 * self.output_dim: 3 * self.output_dim],
-                              *self.layer_norm_params['c'])
-        z3 = self._layer_norm(z[:, 3 * self.output_dim:],
-                              *self.layer_norm_params['o'])
+        z_i = z[:, :self.output_dim]
+        z_f = z[:, self.output_dim: 2 * self.output_dim]
+        z_c = z[:, 2 * self.output_dim: 3 * self.output_dim]
+        z_o = z[:, 3 * self.output_dim:]
 
-        i = self.inner_activation(z0)
-        f = self.inner_activation(z1)
-        c = f * c_tm1 + i * self.activation(z2)
-        o = self.inner_activation(z3)
+        i = self.inner_activation(z_i)
+        f = self.inner_activation(z_f)
+        c = f * c_tm1 + i * self.activation(z_c)
+        o = self.inner_activation(z_o)
 
         if 0 < self.zoneout_c < 1:
             c = zoneout(self.zoneout_c, c_tm1, c,
