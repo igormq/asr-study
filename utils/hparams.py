@@ -52,13 +52,15 @@ class HParams(object):
             return self.update(values)
 
         if type(values) in (set, list):
-            values = "{%s}" % ', '.join(["'%s':%s" % (k, v)
-                                         for k, v in zip(values[::2],
-                                                         values[1::2])])
+            tmp = {}
+            for k, v in zip(values[::2], values[1::2]):
+                try:
+                    tmp[k] = ast.literal_eval(v)
+                except ValueError:
+                    tmp[k] = v
+            return self.update(tmp)
 
-        self.update(ast.literal_eval(values))
-
-        return self
+        return self.update(ast.literal_eval(values))
 
     def values(self):
         """Return the hyperparameter values as a Python dictionary."""
