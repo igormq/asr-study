@@ -13,8 +13,8 @@ class Dummy(DatasetParser):
     """ Fake dataset reader and parser to do some tests
 
     # Arguments
-        nb_speakers: number of speakers
-        nb_utterances_per_speaker: number of utterances that each speaker will
+        num_speakers: number of speakers
+        num_utterances_per_speaker: number of utterances that each speaker will
         have
         max_duration: max duration in seconds of each fake audio
         min_duration: min duration in seconds of each fake audio
@@ -24,9 +24,10 @@ class Dummy(DatasetParser):
         (train, valid and test) given the proportions
     """
 
-    def __init__(self, nb_speakers=10, nb_utterances_per_speaker=10,
+    def __init__(self, dataset_dir=None, num_speakers=10,
+                 num_utterances_per_speaker=10,
                  max_duration=10.0, min_duration=1.0, max_label_length=200,
-                 fs=16e3, split=None, **kwargs):
+                 fs=16e3, split=None, name='dummy', **kwargs):
         '''
         Args:
             split: list or nparray of size 2 that splits the data between
@@ -34,12 +35,10 @@ class Dummy(DatasetParser):
             valid and 5% test
         '''
 
-        kwargs.setdefault('name', 'dummy')
+        super(Dummy, self).__init__(None, name, **kwargs)
 
-        super(Dummy, self).__init__(**kwargs)
-
-        self.nb_speakers = nb_speakers
-        self.nb_utterances_per_speaker = nb_utterances_per_speaker
+        self.num_speakers = num_speakers
+        self.num_utterances_per_speaker = num_utterances_per_speaker
         self.max_duration = max_duration
         self.min_duration = min_duration
         self.fs = fs
@@ -49,13 +48,22 @@ class Dummy(DatasetParser):
         if split is not None and (len(split) != 2 or np.sum(split) > 1.):
             raise ValueError('Split must have len = 2 and must sum <= 1')
 
+    @property
+    def dataset_dir(self):
+        """Filepath to the dataset directory"""
+        return self._dataset_dir
+
+    @dataset_dir.setter
+    def dataset_dir(self, value):
+        self._dataset_dir = value
+
     def _iter(self):
 
         counter = 0
-        total = self.nb_speakers * self.nb_utterances_per_speaker
+        total = self.num_speakers * self.num_utterances_per_speaker
 
-        for speaker in range(self.nb_speakers):
-            for utterance in range(self.nb_utterances_per_speaker):
+        for speaker in range(self.num_speakers):
+            for utterance in range(self.num_utterances_per_speaker):
 
                 duration = np.random.uniform(low=self.min_duration,
                                              high=self.max_duration)
@@ -76,19 +84,19 @@ class Dummy(DatasetParser):
                 label = ''.join([chr(l) for l in label])
 
                 data = {'duration': duration,
-                        'audio': audio_fname,
+                        'input': audio_fname,
                         'label': label,
                         'speaker': 'speaker_%d' % speaker}
 
                 if self.split is not None:
                     if counter < np.floor(self.split[0] * total):
-                        dt = 'train'
+                        dataset = 'train'
                     elif counter < np.floor(np.sum(self.split) * total):
-                        dt = 'valid'
+                        dataset = 'valid'
                     else:
-                        dt = 'test'
+                        dataset = 'test'
 
-                    data['dt'] = dt
+                    data['dataset'] = dataset
                 counter += 1
 
                 yield data

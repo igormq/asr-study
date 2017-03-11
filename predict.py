@@ -1,35 +1,24 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import os
-import codecs
+import argparse
 import json
 import numpy as np
-# Preventing pool_allocator message
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-import argparse
-import h5py
-import inspect
-
-from preprocessing import audio, text
-
-from utils import generic_utils as utils
-from utils.hparams import HParams
 
 from datasets.dataset_generator import DatasetGenerator, DatasetIterator
 
 from utils.core_utils import setup_gpu, load_model
 
+from utils.hparams import HParams
+from utils import generic_utils as utils
+
+from preprocessing import audio, text
+
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description='Evaluating an ASR system.')
 
     parser.add_argument('--model', required=True, type=str)
-    parser.add_argument('--dataset', required=True, type=str)
+    parser.add_argument('--dataset', default=None, type=str)
+    parser.add_argument('--file', default=None, type=str)
     parser.add_argument('--subset', type=str, default='test')
-
-    parser.add_argument('--batch_size', default=32, type=int)
 
     # Features generation (if necessary)
     parser.add_argument('--input_parser', type=str, default=None)
@@ -44,12 +33,18 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--allow_growth', default=False, action='store_true')
 
-    parser.add_argument('--save_transcriptions', default=None, type=str)
+    parser.add_argument('--save', default=None, type=str)
 
     args = parser.parse_args()
     args_nondefault = utils.parse_nondefault_args(
         args, parser.parse_args(
             ['--model', args.model, '--dataset', args.dataset]))
+
+    if args.dataset is None and args.file is None:
+        raise ValueError('dataset or file args must be set.')
+
+    if args.dataset and args.file:
+        print('Both dataset and file args was set. Ignoring file args.')
 
     # GPU configuration
     setup_gpu(args.gpu, args.allow_growth)
@@ -69,14 +64,28 @@ if __name__ == '__main__':
                                          args.label_parser,
                                          params=args.label_parser_params)
 
-    data_gen = DatasetGenerator(input_parser, label_parser,
-                                batch_size=args.batch_size, seed=0)
-    test_flow = data_gen.flow_from_fname(args.dataset, datasets=args.subset)
+    if args.dataset is not None:
+        data_gen = DatasetGenerator(input_parser, label_parser,
+                                    batch_size=1, seed=0, mode='predict')
+        test_flow = data_gen.flow_from_fname(args.dataset, datasets=args.subset)
+    else:
+        test_flow = DatasetIterator(np.array([args.file]), None,
+                                    input_parser=input_parser,
+                                    label_parser=label_parser, mode='predict')
+        test_flow.labels = np.array([u''])
 
-    metrics = model.evaluate_generator(test_flow, test_flow.len,
-                                       max_q_size=10, nb_worker=1)
+    model = load_model(args.model, mode='predict')
 
-    for m, v in zip(model.metrics_names, metrics):
-        print('%s: %4f' % (m, v))
+    results = []
+    for index in range(test_flow.len):
+        prediction = model.predict(test_flow.next())
+        prediction = label_parser.imap(prediction[0])
+        results.append({'label': test_flow.labels[0], 'best': prediction})
+        print('Ground Truth: %s' % (label_parser._sanitize(test_flow.labels[0])))
+        print('   Predicted: %s\n\n' % prediction)
+
+    if args.save is not None:
+        with codecs.open(args.save, 'w', encoding='utf8') as f:
+            json.dump(results, f)
 
     from keras import backend as K; K.clear_session()

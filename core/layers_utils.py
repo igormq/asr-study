@@ -14,16 +14,14 @@ def highway_bias_initializer(shape, name=None):
 
 
 def layer_normalization(x, gain, bias, epsilon=1e-5):
-    m = K.mean(x, axis=-1, keepdims=True)
-    std = K.std(x, axis=-1, keepdims=True)
-    x_normed = (x - m) / (std + epsilon) * gain + bias
+    mean, std = tf.nn.moments(x, [1], keep_dims=True)
+    x_normed = (x - mean) / K.sqrt(std + epsilon) * gain + bias
     return x_normed
 
 
 def multiplicative_integration_init(shape, alpha_init='one',
                                     beta1_init='one', beta2_init='one',
                                     name='mi', has_input=True):
-
     beta1 = initializations.get(beta1_init)(shape, name='%s_beta1' % name)
     if has_input:
         alpha = initializations.get(alpha_init)(shape, name='%s_alpha' % name)
@@ -34,7 +32,8 @@ def multiplicative_integration_init(shape, alpha_init='one',
 
 
 def zoneout(level, h_tm1, h, noise_shape):
-    '''Apply a zoneout function to preserve a fraction of values from h_tm1 in h.'''
+    '''Apply a zoneout function to preserve a fraction of values from h_tm1 in
+    h.'''
     h_diff = h - h_tm1
     h = K.in_train_phase(K.dropout(h_diff,
                                    level,
@@ -50,6 +49,7 @@ def multiplicative_integration(Wx, Uz, params, has_input=True):
 
     beta1 = params
     return beta1 * Uz
+
 
 def to_dense(x):
     if K.is_sparse(x):

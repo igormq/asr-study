@@ -26,18 +26,18 @@ class LapsBM(DatasetParser):
                          24, 15, 1, 21, 28,
                          30, 34, 27, 18, 7]
 
-    def __init__(self, split=False, **kwargs):
+    def __init__(self, dataset_dir=None, name='lapsbm', split=False, **kwargs):
 
-        kwargs.setdefault('name', 'lapsbm')
+        dataset_dir = dataset_dir or 'data/lapsbm'
 
         self._split = split
 
-        super(LapsBM, self).__init__(**kwargs)
+        super(LapsBM, self).__init__(dataset_dir, name, **kwargs)
 
     def _iter(self):
-        for speaker_path in os.listdir(self.dt_dir):
+        for speaker_path in os.listdir(self.dataset_dir):
 
-            root_path = os.path.join(os.path.abspath(self.dt_dir),
+            root_path = os.path.join(os.path.abspath(self.dataset_dir),
                                      speaker_path)
 
             if not os.path.isdir(os.path.join(root_path)):
@@ -66,23 +66,18 @@ class LapsBM(DatasetParser):
                     print('File %s not found' % audio_file)
                     continue
 
-                if not self._is_valid_label(label):
-                    self._logger.error(u'File %s has a forbidden label: "%s". \
-                                      Skipping' % (audio_file, label))
-                    continue
-
-                dt_name = 'valid'
+                dataset = 'valid'
                 if int(speaker_id) in self._test_speaker_id:
-                    dt_name = 'test'
+                    dataset = 'test'
 
                 data = {'duration': duration,
-                        'audio': audio_file,
+                        'input': audio_file,
                         'label': label,
                         'gender': gender,
                         'speaker': speaker_id}
 
                 if self._split:
-                    data['dt'] = dt_name
+                    data['dataset'] = dataset
 
                 yield data
 

@@ -9,9 +9,9 @@ import json
 import time
 
 from preprocessing import audio, text
-from common import utils
-from common import apis
+from utils import generic_utils as utils
 
+import apis
 import speech_recognition as sr
 
 if __name__ == '__main__':
@@ -24,9 +24,9 @@ over an API.')
 over all dataset, not only with the dt key equals test.')
 
     # Label generation (if necessary)
-    parser.add_argument('--text_parser', type=str,
+    parser.add_argument('--label_parser', type=str,
                         default='simple_char_parser')
-    parser.add_argument('--text_parser_params', type=str, default='{}')
+    parser.add_argument('--label_parser_params',nargs='+', default=[])
 
     # Other configs
     parser.add_argument('--save_every', default=10, type=int)
@@ -43,9 +43,9 @@ over all dataset, not only with the dt key equals test.')
         save = '%s_eval_apis.json' % args.dataset.split(os.path.sep)[-2]
 
     # Recovering text parser
-    text_parser = utils.get_from_module('preprocessing.text',
-                                        args.text_parser,
-                                        args.text_parser_params)
+    label_parser = utils.get_from_module('preprocessing.text',
+                                        args.label_parser,
+                                        params=args.label_parser_params)
 
     if not utils.check_ext(args.dataset, 'json'):
         raise ValueError('dataset must be a json file')

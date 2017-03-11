@@ -60,13 +60,14 @@ def decode_output_shape(inputs_shape):
 def ctc_lambda_func(args):
     """ CTC cost function
     """
-    y_pred, labels, input_length = args
+    y_pred, labels, inputs_length = args
 
     # Little hack for load_model
     import tensorflow as tf
 
-    return tf.nn.ctc_loss(tf.transpose(y_pred, perm=[1, 0, 2]),
-                          labels, input_length[:, 0])
+    return tf.nn.ctc_loss(labels,
+                          tf.transpose(y_pred, perm=[1, 0, 2]),
+                          inputs_length[:, 0])
 
 
 def ctc_dummy_loss(y_true, y_pred):

@@ -5,17 +5,21 @@ from __future__ import print_function
 import os
 # Preventing pool_allocator message
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import logging
 
+import argparse
+import uuid
+import sys
+import json
+import datetime
+import inspect
+import codecs
+
+import logging
 try:
     import warpctc_tensorflow
 except ImportError:
     logging.warning('warpctc binding for tensorflow not found. :(')
-
 import tensorflow as tf
-import codecs
-
-from sklearn.model_selection import train_test_split
 
 import keras
 
@@ -26,20 +30,16 @@ from keras.callbacks import ReduceLROnPlateau
 from core import metrics
 from core.ctc_utils import ctc_dummy_loss, decoder_dummy_loss
 from core.callbacks import MetaCheckpoint, ProgbarLogger
+from utils.core_utils import setup_gpu
 
 from preprocessing import audio, text
 
-from common.dataset_generator import DatasetGenerator
-from common.hparams import HParams
+from datasets.dataset_generator import DatasetGenerator
+from utils.hparams import HParams
 
-import argparse
-import uuid
-import sys
-import json
-import datetime
-import inspect
+import utils.generic_utils as utils
 
-import common.utils as utils
+from utils.core_utils import load_model
 
 if __name__ == '__main__':
 
@@ -49,49 +49,41 @@ if __name__ == '__main__':
     parser.add_argument('--load', default=None, type=str)
 
     # Model settings
-    parser.add_argument('--model', default='graves2006', type=str)
-    parser.add_argument('--model_params', default='{}', type=str)
+    parser.add_argument('--model', default='brsmv1', type=str)
+    parser.add_argument('--model_params', nargs='+', default=[])
 
     # Hyper parameters
-    parser.add_argument('--nb_epoch', default=100, type=int)
-    parser.add_argument('--lr', default=0.01, type=float)
+    parser.add_argument('--num_epochs', default=100, type=int)
+    parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
-    parser.add_argument('--clipnorm', default=5, type=float)
+    parser.add_argument('--clipnorm', default=400, type=float)
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--opt', default='sgd', type=str,
-                        choices=['sgd', 'adam'])  # optimizer
+    parser.add_argument('--opt', default='adam', type=str,
+                        choices=['sgd', 'adam'])
     # End of hyper parameters
 
     # Dataset definitions
-    parser.add_argument('--dataset', default=None, type=str,
-                        help="Path to dataset h5 or json file \
-                        separated by train/valid/test")
-    # If --dataset was not defined
-    parser.add_argument('--train', type=str, default=None)
-    parser.add_argument('--test', type=str, default=None)
-    parser.add_argument('--valid', type=str, default=None)
+    parser.add_argument('--dataset', default=None, type=str, nargs='+')
 
     # Features generation (if necessary)
-    parser.add_argument('--feats', type=str, default='raw',
-                        choices=['mfcc', 'raw', 'logfbank'])
-    parser.add_argument('--feats_params', type=str, default='{}')
+    parser.add_argument('--input_parser', type=str, default=None)
+    parser.add_argument('--input_parser_params', nargs='+', default=[])
 
     # Label generation (if necessary)
-    parser.add_argument('--text_parser', type=str,
+    parser.add_argument('--label_parser', type=str,
                         default='simple_char_parser')
-    parser.add_argument('--text_parser_params', type=str, default='{}')
+    parser.add_argument('--label_parser_params', nargs='+', default=[])
 
     # Callbacks
     parser.add_argument('--lr_schedule', default=None)
-    parser.add_argument('--lr_params',
-                        default="{'monitor': 'val_loss', \
-                        'factor':0.1, 'patience':5, 'min_lr':1e-6}")
+    parser.add_argument('--lr_params', nargs='+', default=[])
 
     # Other configs
     parser.add_argument('--save', default=None, type=str)
     parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--allow_growth', default=False, action='store_true')
     parser.add_argument('--verbose', default=0, type=int)
+    parser.add_argument('--seed', default=None, type=float)
 
     args = parser.parse_args()
 
@@ -105,8 +97,8 @@ if __name__ == '__main__':
         show_metrics=['loss', 'decoder_ler', 'val_loss', 'val_decoder_ler'])
 
     # GPU configuration
-    utils.config_gpu(args.gpu, args.allow_growth,
-                     log_device_placement=args.verbose > 1)
+    setup_gpu(args.gpu, args.allow_growth,
+              log_device_placement=args.verbose > 1)
 
     # Initial configuration
     epoch_offset = 0
@@ -117,11 +109,10 @@ if __name__ == '__main__':
                                                       parser.parse_args([]))
 
         logger.info('Loading model...')
-        model, meta = utils.load_model(args.load, return_meta=True)
+        model, meta = load_model(args.load, return_meta=True)
 
         logger.info('Loading parameters...')
-        args = HParams(
-            from_str=str(meta['training_args'])).update(vars(args_nondefault))
+        args = HParams(**meta['training_args']).update(vars(args_nondefault))
 
         epoch_offset = len(meta['epochs'])
         logger.info('Current epoch: %d' % epoch_offset)
@@ -135,14 +126,14 @@ if __name__ == '__main__':
         # Recovering all valid models
         model_fn = utils.get_from_module('core.models', args.model)
         # Loading model
-        model = model_fn(args.model_params)
+        model = model_fn(**(HParams().parse(args.model_params).values()))
 
         logger.info('Setting the optimizer...')
         # Optimization
-        if args.opt == 'sgd':
+        if args.opt.strip().lower() == 'sgd':
             opt = SGD(lr=args.lr, momentum=args.momentum,
                       clipnorm=args.clipnorm)
-        elif args.opt == 'adam':
+        elif args.opt.strip().lower() == 'adam':
             opt = Adam(lr=args.lr, clipnorm=args.clipnorm)
 
         # Compile with dummy loss
@@ -153,19 +144,20 @@ if __name__ == '__main__':
 
     logger.info('Creating results folder...')
     # Creating the results folder
-    name = args.save
-    if name is None:
-        name = os.path.join('results',
-                            '%s_%s' % (args.model, datetime.datetime.now()))
-    if not os.path.isdir(name):
-        os.makedirs(name)
+    output_dir = args.save
+    if output_dir is None:
+        output_dir = os.path.join('results',
+                                  '%s_%s' % (args.model,
+                                             datetime.datetime.now()))
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir)
 
     logger.info('Adding callbacks')
     # Callbacks
-    model_ckpt = MetaCheckpoint(os.path.join(name, 'model.h5'),
+    model_ckpt = MetaCheckpoint(os.path.join(output_dir, 'model.h5'),
                                 training_args=args, meta=meta)
     best_ckpt = MetaCheckpoint(
-        os.path.join(name, 'best.h5'), monitor='val_decoder_ler',
+        os.path.join(output_dir, 'best.h5'), monitor='val_decoder_ler',
         save_best_only=True, mode='min', training_args=args, meta=meta)
     callback_list = [model_ckpt, best_ckpt]
 
@@ -174,65 +166,70 @@ if __name__ == '__main__':
         lr_schedule_fn = utils.get_from_module('keras.callbacks',
                                                args.lr_schedule)
         if lr_schedule_fn:
-            lr_schedule = lr_schedule_fn(
-                **HParams(from_str=args.lr_params).values())
+            lr_schedule = lr_schedule_fn(**HParams().parse(args.lr_params).values())
             callback_list.append(lr_schedule)
+        else:
+            raise ValueError('Learning rate schedule unrecognized')
 
     logger.info('Getting the feature extractor...')
     # Features extractor
-    feats_extractor = utils.get_from_module('preprocessing.audio',
-                                            args.feats,
-                                            args.feats_params)
+    input_parser = utils.get_from_module('preprocessing.audio',
+                                         args.input_parser,
+                                         params=args.input_parser_params)
 
     logger.info('Getting the text parser...')
     # Recovering text parser
-    text_parser = utils.get_from_module('preprocessing.text',
-                                        args.text_parser,
-                                        args.text_parser_params)
+    label_parser = utils.get_from_module('preprocessing.text',
+                                         args.label_parser,
+                                         params=args.label_parser_params)
 
     logger.info('Getting the data generator...')
     # Data generator
-    data_gen = DatasetGenerator(feats_extractor, text_parser,
-                                batch_size=args.batch_size, seed=0)
+    data_gen = DatasetGenerator(input_parser, label_parser,
+                                batch_size=args.batch_size,
+                                seed=args.seed)
     # iterators over datasets
     train_flow, valid_flow, test_flow = None, None, None
+    num_val_samples = num_test_samples = 0
 
     logger.info('Generating flow...')
-    if args.dataset is not None:
-        train_flow, valid_flow, test_flow = data_gen.flows_from_fname(
-            args.dataset)
+    if len(args.dataset) == 1:
+        train_flow, valid_flow, test_flow = data_gen.flow_from_fname(
+            args.dataset[0], datasets=['train', 'valid', 'test'])
+        num_val_samples = valid_flow.len
     else:
-        if args.train:
-            train_flow = data_gen.flow_from_fname(args.train, dt_name='train')
+        train_flow = data_gen.flow_from_fname(args.dataset[0])
+        valid_flow = data_gen.flow_from_fname(args.dataset[1])
 
-        if args.valid:
-            valid_flow = data_gen.flow_from_fname(args.valid, dt_name='valid')
+        num_val_samples = valid_flow.len
+        if len(args.dataset) == 3:
+            test_flow = data_gen.flow_from_fname(args.dataset[2])
+            num_test_samples = test_flow.len
 
-        if args.test:
-             test_flow = data_gen.flow_from_fname(args.test, dt_name='test')
-
-    nb_val_samples = None
-    if valid_flow:
-        nb_val_samples = valid_flow.len
-
+    logger.info(str(vars(args)))
+    print(str(vars(args)))
     logger.info('Initialzing training...')
     # Fit the model
     model.fit_generator(train_flow, samples_per_epoch=train_flow.len,
-                        nb_epoch=args.nb_epoch, validation_data=valid_flow,
-                        nb_val_samples=nb_val_samples, max_q_size=10,
+                        nb_epoch=args.num_epochs, validation_data=valid_flow,
+                        nb_val_samples=num_val_samples, max_q_size=10,
                         nb_worker=1, callbacks=callback_list, verbose=1,
                         initial_epoch=epoch_offset)
 
     if test_flow:
         del model
-        model = utils.load_model(os.path.join(name, 'best.h5'))
+        model = load_model(os.path.join(output_dir, 'best.h5'), mode='eval')
         logger.info('Evaluating best model on test set')
         metrics = model.evaluate_generator(test_flow, test_flow.len,
                                            max_q_size=10, nb_worker=1)
 
         msg = 'Total loss: %.4f\n\
-CTC Loss: %.4f\nLER: %.2f' % (metrics[0], metrics[1], metrics[3])
+CTC Loss: %.4f\nLER: %.2f%%' % (metrics[0], metrics[1], metrics[3]*100)
         logger.info(msg)
 
-        with open(os.path.join(name, 'results.txt'), 'w') as f:
+        with open(os.path.join(output_dir, 'results.txt'), 'w') as f:
             f.write(msg)
+
+        print(msg)
+
+    K.clear_session()

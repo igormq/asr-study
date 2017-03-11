@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 import os
 import argparse
 import yaml
@@ -6,7 +8,7 @@ import numpy as np
 import openpyxl
 from openpyxl import Workbook
 
-from common.utils import load_meta
+from utils.core_utils import load_meta
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -31,20 +33,7 @@ if __name__ == "__main__":
             print('model.h5 not found in %s' % subdir)
             continue
 
-        meta = None
-        try:
-            meta = load_meta(os.path.join(subdir, 'model.h5'))
-        except KeyError:
-            print("%s/model.h5 doesn't have meta attribute" % subdir)
-
-            if 'meta.yaml' not in files:
-                print('\t%s/meta.yaml not found either. Ignoring file'
-                      % subdir)
-                continue
-
-            with open(os.path.join(subdir, 'meta.yaml'), 'r') as f:
-                meta = yaml.load(f)
-
+        meta = load_meta(os.path.join(subdir, 'model.h5'))
         metas[subdir.split(os.sep)[-1]] = meta
 
     training_args = list(set([arg for model in metas for arg in
@@ -55,13 +44,10 @@ if __name__ == "__main__":
         args = metas[model]['training_args']
         meta = metas[model]
 
-        key = None
-        for search_key in ('dataset', 'train'):
-            if (search_key in args and args[search_key] is not None):
-                key = args[search_key].split(os.sep)[-2]
-                break
-
-        key = key or 'unknown'
+        try:
+            key = args['dataset'][0].split(os.sep)[-2]
+        except KeyError:
+            key = 'unknown'
 
         if key not in datasets:
             datasets[key] = {}
@@ -75,7 +61,8 @@ columns = ['path'] + ['epoch', 'best_val_ler'] + training_args
 for name in datasets:
     ws = wb.create_sheet(name)
 
-    cell_range = ws['A1':'%s1' % openpyxl.utils.get_column_letter(len(columns))][0]
+    cell_range = ws['A1':'%s1'
+                    % openpyxl.utils.get_column_letter(len(columns))][0]
 
     for i, cell in zip(range(len(cell_range)), cell_range):
         cell.value = columns[i]
@@ -90,7 +77,11 @@ for name in datasets:
         ws['C%d' % row] = np.min(meta['val_decoder_ler'])
 
         for arg, val in meta['training_args'].items():
-            col = openpyxl.utils.get_column_letter(training_args.index(arg) + 4)
+            col = openpyxl.utils.get_column_letter(
+                training_args.index(arg) + 4)
+
+            if type(val) in (list, set):
+                val = ', '.join(val)
 
             ws['%s%d' % (col, row)] = val
 
