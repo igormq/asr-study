@@ -51,7 +51,7 @@ class CSLU(DatasetParser):
                     continue
 
                 yield {'duration': duration,
-                       'audio': audio_file,
+                       'input': audio_file,
                        'label': label,
                        'speaker': speaker_id}
 
