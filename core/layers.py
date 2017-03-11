@@ -404,7 +404,7 @@ to option `gpu`.")
                 name='{}_mi_beta2'.format(self.name))
 
         if self.layer_norm is not None:
-            ln_gain_init, ln_bias_init = self.ln
+            ln_gain_init, ln_bias_init = self.layer_norm
 
             self.layer_norm_params = {}
 
