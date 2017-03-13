@@ -183,7 +183,7 @@ There are a plenty of work to be done. All contributions are welcome :).
 ## Acknowledgements
 * [python_speech_features](https://github.com/jameslyons/python_speech_features) for the [audio preprocessing](preprocessing/audio.py)
 * [Google Magenta](https://github.com/tensorflow/magenta) for the [hparams](core/hparams.py)
-* @robertomest for help me with everything
+* @robertomest for helping me with everything
 
 ## License
 See [LICENSE.md](LICENSE.md) for more information
