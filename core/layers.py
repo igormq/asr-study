@@ -421,10 +421,11 @@ to option `gpu`.")
 
                 self.layer_norm_params[n] = [gain, bias]
 
-    def _layer_norm(self, x, gain, bias):
+    def _layer_norm(self, x, name):
         if self.layer_norm is None:
             return x
 
+        gain, bias = self.layer_norm_params[name]
         return layer_normalization(x, gain, bias)
 
     def step(self, x, states):
@@ -433,10 +434,8 @@ to option `gpu`.")
         B_U = states[2]
         B_W = states[3]
 
-        Uh = self._layer_norm(K.dot(h_tm1 * B_U[0], self.U),
-                              *self.layer_norm_params['Uh'])
-        Wx = self._layer_norm(K.dot(x * B_W[0], self.W),
-                              *self.layer_norm_params['Wx'])
+        Uh = self._layer_norm(K.dot(h_tm1 * B_U[0], self.U), 'Uh')
+        Wx = self._layer_norm(K.dot(x * B_W[0], self.W), 'Wx')
 
         if self.mi is not None:
             z = self.mi_alpha * Wx * Uh + self.mi_beta1 * Uh + \
@@ -459,7 +458,7 @@ to option `gpu`.")
                         noise_shape=(self.output_dim,))
 
         # this is returning a lot of nan
-        new_c = self._layer_norm(c, *self.layer_norm_params['new_c'])
+        new_c = self._layer_norm(c, 'new_c')
 
         h = o * self.activation(new_c)
         if 0 < self.zoneout_h < 1:
