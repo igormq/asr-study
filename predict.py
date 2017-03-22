@@ -1,6 +1,7 @@
 import argparse
 import json
 import numpy as np
+import codecs
 
 from datasets.dataset_generator import DatasetGenerator, DatasetIterator
 
