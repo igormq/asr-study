@@ -164,12 +164,10 @@ There are a plenty of work to be done. All contributions are welcome :).
 * Python 2.7
 * Numpy
 * Scipy
-* Pyaml
+* Pyyaml
 * HDF5
-* Codecs
 * Unidecode
 * Librosa
-* Inspect
 * Tensorflow
 * Keras
 
@@ -177,7 +175,7 @@ There are a plenty of work to be done. All contributions are welcome :).
 * [warp-ctc](https://github.com/baidu-research/warp-ctc) (for fast CTC loss calculation)
 
 #### optional
-* [speech_recognition](https://pypi.python.org/pypi/SpeechRecognition/) (to use the [eval apis](extras/eval_apis.py))
+* [SpeechRecognition](https://pypi.python.org/pypi/SpeechRecognition/) (to use the [eval apis](extras/eval_apis.py))
 * [openpyxl](https://pypi.python.org/pypi/openpyxl) (to [save the results in a excel file](extras/results2xlsx.py))
 
 ## Acknowledgements
