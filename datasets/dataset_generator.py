@@ -279,6 +279,9 @@ class JSONIterator(DatasetIterator):
 
     def __init__(self, fname, dataset=None, **kwargs):
 
+        self._logger = logging.getLogger('%s.%s' % (__name__,
+                                                    self.__class__.__name__))
+
         kwargs.setdefault('input_parser', audio.raw)
 
         if kwargs.get('input_parser') is None:
@@ -291,6 +294,10 @@ class JSONIterator(DatasetIterator):
             ld = json.load(f)
 
         data = utils.ld2dl(ld)
+
+        if dataset and not 'dataset' in data:
+            self._logger.warning('No dataset key found. Falling back to None')
+            dataset = None
 
         if dataset:
             inputs = np.array([d['audio']
