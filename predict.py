@@ -28,6 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--label_parser', type=str,
                         default='simple_char_parser')
     parser.add_argument('--label_parser_params', nargs='+', default=[])
+    parser.add_argument('--no_decoder', action='store_true', default=False)
 
     # Other configs
     parser.add_argument('--gpu', default='0', type=str)
@@ -74,7 +75,7 @@ if __name__ == '__main__':
                                     label_parser=label_parser, mode='predict')
         test_flow.labels = np.array([u''])
 
-    model = load_model(args.model, mode='predict')
+    model = load_model(args.model, mode='predict', decoder=(not args.no_decoder))
 
     results = []
     for index in range(test_flow.len):
