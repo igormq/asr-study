@@ -33,8 +33,11 @@ if __name__ == "__main__":
             print('model.h5 not found in %s' % subdir)
             continue
 
-        meta = load_meta(os.path.join(subdir, 'model.h5'))
-        metas[subdir.split(os.sep)[-1]] = meta
+        try:
+            meta = load_meta(os.path.join(subdir, 'model.h5'))
+            metas[subdir.split(os.sep)[-1]] = meta
+        except KeyError:
+            print('meta not found in %s' % os.path.join(subdir, 'model.h5'))
 
     training_args = list(set([arg for model in metas for arg in
                              metas[model]['training_args']]))
@@ -45,7 +48,10 @@ if __name__ == "__main__":
         meta = metas[model]
 
         try:
-            key = args['dataset'][0].split(os.sep)[-2]
+            key = args['dataset']
+            if type(key) in (list, set):
+                key = key[0]
+            key = key.split(os.sep)[-2]
         except KeyError:
             key = 'unknown'
 
