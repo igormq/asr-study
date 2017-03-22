@@ -46,7 +46,7 @@ def get_custom_objects():
 
     return dict(all_custom_objects)
 
-def load_model(model_fname, return_meta=False, mode='train'):
+def load_model(model_fname, return_meta=False, mode='train', **kwargs):
     """ Loading keras model with custom objects
 
     Args
@@ -64,10 +64,14 @@ def load_model(model_fname, return_meta=False, mode='train'):
                                     custom_objects=get_custom_objects())
 
     # Define the new decoder and the to_dense layer
-    dec = Lambda(ctc_utils.decode,
-                 output_shape=ctc_utils.decode_output_shape,
-                 arguments={'is_greedy': False,
-                            'beam_width': 400}, name='beam_search')
+    if kwargs.get('decoder', True):
+        dec = Lambda(ctc_utils.decode,
+                     output_shape=ctc_utils.decode_output_shape,
+                     arguments={'is_greedy': kwargs.get('is_greedy', False),
+                                'beam_width': kwargs.get('beam_width', 400)},
+                     name='beam_search')
+    else:
+        dec = Lambda(lambda x: x[0])
 
     if mode == 'predict':
         y_pred = (model.get_layer('y_pred') or

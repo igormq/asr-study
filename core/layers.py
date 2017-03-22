@@ -426,6 +426,7 @@ to option `gpu`.")
             return x
 
         gain, bias = self.layer_norm_params[param_name]
+
         return layer_normalization(x, gain, bias)
 
     def step(self, x, states):
@@ -434,10 +435,8 @@ to option `gpu`.")
         B_U = states[2]
         B_W = states[3]
 
-        Uh = self._layer_norm(K.dot(h_tm1 * B_U[0], self.U),
-                              'Uh')
-        Wx = self._layer_norm(K.dot(x * B_W[0], self.W),
-                              'Wx')
+        Uh = self._layer_norm(K.dot(h_tm1 * B_U[0], self.U), 'Uh')
+        Wx = self._layer_norm(K.dot(x * B_W[0], self.W), 'Wx')
 
         if self.mi is not None:
             z = self.mi_alpha * Wx * Uh + self.mi_beta1 * Uh + \
