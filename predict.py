@@ -1,5 +1,7 @@
 import argparse
 import json
+import h5py
+import os
 import numpy as np
 import codecs
 
@@ -36,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--allow_growth', default=False, action='store_true')
 
     parser.add_argument('--save', default=None, type=str)
+    parser.add_argument('--override', default=False, action='store_true')
 
     args = parser.parse_args()
     args_nondefault = utils.parse_nondefault_args(
@@ -68,26 +71,85 @@ if __name__ == '__main__':
 
     if args.dataset is not None:
         data_gen = DatasetGenerator(input_parser, label_parser,
-                                    batch_size=1, seed=0, mode='predict')
-        test_flow = data_gen.flow_from_fname(args.dataset, datasets=args.subset)
+                                    batch_size=1, seed=0, mode='predict',
+                                    shuffle=False)
+        test_flow = data_gen.flow_from_fname(args.dataset,
+                                             datasets=args.subset)
     else:
         test_flow = DatasetIterator(np.array([args.file]), None,
                                     input_parser=input_parser,
-                                    label_parser=label_parser, mode='predict')
+                                    label_parser=label_parser, mode='predict',
+                                    shuffle=False)
         test_flow.labels = np.array([u''])
 
-    model = load_model(args.model, mode='predict', decoder=(not args.no_decoder))
+    model = load_model(args.model, mode='predict',
+                       decoder=(not args.no_decoder))
 
     results = []
     for index in range(test_flow.len):
         prediction = model.predict(test_flow.next())
-        prediction = label_parser.imap(prediction[0])
-        results.append({'label': test_flow.labels[0], 'best': prediction})
-        print('Ground Truth: %s' % (label_parser._sanitize(test_flow.labels[0])))
-        print('   Predicted: %s\n\n' % prediction)
+        if not args.no_decoder:
+            prediction = label_parser.imap(prediction[0])
+
+            print('Ground Truth: %s' %
+                  (label_parser._sanitize(test_flow.labels[index])))
+            print('   Predicted: %s\n\n' % prediction)
+        else:
+            prediction = prediction[0]
+
+        results.append({'label': test_flow.labels[index],
+                        'prediction': prediction,
+                        'input': test_flow.inputs[index]})
 
     if args.save is not None:
+        if os.path.exists(args.save):
+            if not args.override:
+                raise IOError('Unable to create file')
+            os.remove(args.save)
+
+        if args.no_decoder:
+            with h5py.File(args.save) as f:
+                predictions = f.create_dataset(
+                    'predictions', (0,), maxshape=(None,),
+                    dtype=h5py.special_dtype(vlen=np.dtype('float32')))
+                predictions.attrs['num_labels'] = results[0]['prediction'].shape[-1]
+
+                labels = f.create_dataset(
+                    'labels', (0,), maxshape=(None,),
+                    dtype=h5py.special_dtype(vlen=unicode))
+
+                inputs = f.create_dataset(
+                    'inputs', (0,), maxshape=(None,),
+                    dtype=h5py.special_dtype(vlen=unicode))
+
+                for index, result in enumerate(results):
+
+                    label = result['label']
+                    prediction = result['prediction']
+                    input_ = result['input']
+
+                    inputs.resize(inputs.shape[0] + 1, axis=0)
+                    inputs[inputs.shape[0] - 1] = input_
+
+                    labels.resize(labels.shape[0] + 1, axis=0)
+                    labels[labels.shape[0] - 1] = label.encode('utf8')
+
+                    predictions.resize(predictions.shape[0] + 1, axis=0)
+                    predictions[predictions.shape[0] - 1] = prediction.flatten().astype('float32')
+
+                    # Flush to disk only when it reaches 128 samples
+                    if index % 128 == 0:
+                        print('%d/%d done.' % (index, len(results)))
+                        f.flush()
+
+                f.flush()
+                print('%d/%d done.' % (len(results), len(results)))
+        else:
+            raise ValueError('save param must be set if no_decoder is Truepython')
+
+    else:
         with codecs.open(args.save, 'w', encoding='utf8') as f:
             json.dump(results, f)
 
-    from keras import backend as K; K.clear_session()
+    from keras import backend as K
+    K.clear_session()
