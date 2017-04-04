@@ -26,7 +26,7 @@ class Dummy(DatasetParser):
 
     def __init__(self, dataset_dir=None, num_speakers=10,
                  num_utterances_per_speaker=10,
-                 max_duration=10.0, min_duration=1.0, max_label_length=200,
+                 max_duration=10.0, min_duration=1.0, max_label_length=50,
                  fs=16e3, split=None, name='dummy', **kwargs):
         '''
         Args:
