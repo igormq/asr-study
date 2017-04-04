@@ -48,7 +48,8 @@ class DatasetGenerator(object):
         """ Returns an specific iterator given the filename
 
         # Arguments
-            datasets: str or list. If str will return one iterator; otherwise will return len(dataset) iterators for each dataset
+            datasets: str or list. If str will return one iterator; otherwise
+            will return len(dataset) iterators for each dataset
 
         # Inputs
             fname: path to a file.
@@ -68,7 +69,7 @@ class DatasetGenerator(object):
         if h5py.is_hdf5(fname):
             h5_f = h5py.File(fname, 'r')
             out = [self.flow_from_h5_group(h5_f[dataset])
-                    for dataset in datasets]
+                   for dataset in datasets]
 
         ext = os.path.splitext(fname)[1]
         if ext == '.json':
@@ -167,7 +168,8 @@ class DatasetIterator(Iterator):
         self.mode = mode
 
         if self.input_parser is not None:
-            logging.warning('Feature extractor is not None. It may slow down training')
+            logging.warning('Feature extractor is not None. It may slow down'
+                            + ' training')
 
         super(DatasetIterator, self).__init__(len(inputs), batch_size,
                                               shuffle, seed)
@@ -295,17 +297,17 @@ class JSONIterator(DatasetIterator):
 
         data = utils.ld2dl(ld)
 
-        if dataset and not 'dataset' in data:
+        if dataset and 'dataset' not in data:
             self._logger.warning('No dataset key found. Falling back to None')
             dataset = None
 
         if dataset:
-            inputs = np.array([d['audio']
-                               for d in data if d['dataset'] == dataset])
-            labels = np.array([d['label']
-                               for d in data if d['dataset'] == dataset])
+            inputs = np.array([i for i, d in zip(
+                data['input'], data['dataset']) if d == dataset])
+            labels = np.array([l for l, d in zip(
+                data['label'], data['dataset']) if d == dataset])
         else:
-            inputs = np.array(data['audio'])
+            inputs = np.array(data['input'])
             labels = np.array(data['label'])
 
         super(JSONIterator, self).__init__(inputs, labels, **kwargs)
@@ -337,4 +339,5 @@ class DictListIterator(DatasetIterator):
 
     def _get_by_dataset(self, dl, dataset):
         mask = [i for i, d in enumerate(dl['dataset']) if d == dataset]
-        return {k: np.array(v)[mask] for k, v in dl.iteritems() if k != 'dataset'}
+        return {k: np.array(v)[mask] for k, v in dl.iteritems()
+                if k != 'dataset'}
