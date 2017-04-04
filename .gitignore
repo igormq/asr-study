@@ -202,3 +202,4 @@ results*/
 data/**/*
 *.tar.gz
 *.xls*
+*.json
