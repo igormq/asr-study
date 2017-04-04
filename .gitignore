@@ -1,4 +1,4 @@
-
+Ignoring automatic generated folders in data
 # Created by https://www.gitignore.io/api/sublimetext,macos,linux,python,ipythonnotebook,windows
 
 ### SublimeText ###
@@ -199,3 +199,6 @@ results/
 notebooks/
 sims/
 results*/
+data/**/*
+*.tar.gz
+*.xls*
