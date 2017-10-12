@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 import argparse
 
 from utils import generic_utils as utils
+from utils.hparams import HParams
 
 import preprocessing
 import datasets
@@ -38,11 +39,12 @@ if __name__ == '__main__':
                                          args.label_parser,
                                          params=args.label_parser_params)
 
-    dataset = parser(args.dataset_dir)
+    dataset = parser(args.dataset_dir,
+                     **HParams().parse(args.parser_params).values())
 
     output_file = dataset.to_h5(fname=args.output_file,
                                 input_parser=input_parser,
                                 label_parser=label_parser,
                                 override=args.override)
 
-    print('Dataset %s saved at %s' % (parser, output_file))
+    print('Dataset %s saved at %s' % (parser.name, output_file))

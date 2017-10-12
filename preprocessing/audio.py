@@ -52,7 +52,8 @@ class Feature(object):
             TypeError if audio were not recognized
 
         """
-        if (isinstance(audio, str) or isinstance(audio, unicode)) and os.path.isfile(audio):
+        if ((isinstance(audio, str) or isinstance(audio, unicode))
+            and os.path.isfile(audio)):
             audio, current_fs = librosa.audio.load(audio)
             audio = librosa.core.resample(audio, current_fs, self.fs)
             feats = self._call(audio)
