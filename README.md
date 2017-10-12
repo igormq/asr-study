@@ -16,8 +16,7 @@ $ cd data; sh download_datasets.sh
 Next, you can preprocess it into an hdf5 file. Click [here](extras/make_dataset.py) for more information.
 
 ```bash
-$ python -m extras.make_dataset --parser brsp \
---input_parser mfcc --label_parser simple_char_parser
+$ python -m extras.make_dataset --parser brsd --input_parser mfcc
 ```
 
 #### Train the network
@@ -25,7 +24,7 @@ $ python -m extras.make_dataset --parser brsp \
 You can train the network with the `train.py` script. For more usage information see [this](train.py). To train with the default parameters:
 
 ```bash
-$ python train.py --dataset .datasets/brsp/data.h5
+$ python train.py --dataset .datasets/brsd/data.h5
 ```
 
 ## Pre-trained model

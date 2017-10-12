@@ -3,6 +3,8 @@ from __future__ import absolute_import, division, print_function
 import os
 import codecs
 import json
+
+import logging
 import h5py
 
 import numpy as np
@@ -10,8 +12,6 @@ import numpy as np
 from preprocessing import audio, text
 from datasets import DT_ABSPATH
 from utils.generic_utils import safe_mkdirs, ld2dl
-
-import logging
 
 
 class DatasetParser(object):

@@ -3,12 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 from datasets import DatasetParser
-from datasets import CSLU, VoxForge, Sid, LapsBM
-
-import os
-import re
-import librosa
-import codecs
+from datasets import LapsBM
 
 from utils.generic_utils import get_from_module
 
@@ -30,7 +25,7 @@ class BRSD(DatasetParser):
 
     """
 
-    def __init__(self, dataset_dir=None, name='brsp', **kwargs):
+    def __init__(self, dataset_dir=None, name='brsd', **kwargs):
 
         dataset_dir = dataset_dir or {'lapsbm': None,
                                       'voxforge': None,
@@ -49,7 +44,8 @@ class BRSD(DatasetParser):
         """Filepath to the dataset directory"""
 
         if value is None:
-            raise ValueError("You must set the variable dataset_dir (the location of dataset) before continue")
+            raise ValueError("You must set the variable dataset_dir"
+                             " (the location of dataset) before continue")
 
         if not isinstance(value, dict):
             raise ValueError("dataset_dir must be a dictionary")
