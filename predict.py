@@ -52,7 +52,8 @@ if __name__ == '__main__':
     setup_gpu(args.gpu, args.allow_growth)
 
     # Loading model
-    model, meta = load_model(args.model, return_meta=True, mode='eval')
+    model, meta = load_model(args.model, return_meta=True,
+                             mode='predict', decoder=(not args.no_decoder))
 
     args = HParams(**meta['training_args']).update(vars(args_nondefault))
 
@@ -76,13 +77,12 @@ if __name__ == '__main__':
                                     label_parser=label_parser, mode='predict')
         test_flow.labels = np.array([u''])
 
-    model = load_model(args.model, mode='predict', decoder=(not args.no_decoder))
-
     results = []
     for index in range(test_flow.len):
         prediction = model.predict(test_flow.next())
-        prediction = label_parser.imap(prediction[0])
-        results.append({'label': test_flow.labels[0], 'best': prediction})
+        if not args.no_decoder:
+            prediction = label_parser.imap(prediction[0])
+        results.append({'input': test_flow.inputs[0].tolist(), 'label': test_flow.labels[0], 'best': prediction.tolist()})
         print('Ground Truth: %s' % (label_parser._sanitize(test_flow.labels[0])))
         print('   Predicted: %s\n\n' % prediction)
 
