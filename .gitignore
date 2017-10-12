@@ -201,3 +201,7 @@ sims/
 results*/
 data/*/**
 data/*
+refs/
+software
+results.json
+.vscode
