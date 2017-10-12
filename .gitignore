@@ -199,3 +199,5 @@ results/
 notebooks/
 sims/
 results*/
+data/*/**
+data/*
